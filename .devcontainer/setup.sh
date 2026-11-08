@@ -20,9 +20,18 @@ fi
 echo "▸ Installing dependencies"
 pnpm install --frozen-lockfile
 
-echo "▸ Starting Postgres, MinIO and Mailpit"
-docker compose up -d --wait postgres mailpit minio
-docker compose up minio-init
+if [ "${TRACKLANE_SERVICES_MANAGED:-}" = "1" ]; then
+  # Dev container: Postgres, MinIO and Mailpit already run as sibling containers.
+  echo "▸ Waiting for Postgres"
+  for _ in $(seq 1 60); do
+    (echo > /dev/tcp/127.0.0.1/5432) 2>/dev/null && break
+    sleep 1
+  done
+else
+  echo "▸ Starting Postgres, MinIO and Mailpit"
+  docker compose up -d --wait postgres mailpit minio
+  docker compose up minio-init
+fi
 
 echo "▸ Migrating and seeding the database"
 pnpm db:generate

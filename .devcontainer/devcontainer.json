@@ -1,13 +1,11 @@
 {
   "name": "Tracklane",
-  "image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
-  "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {
-      "moby": true,
-      "dockerDashComposeVersion": "none",
-      "installDockerBuildx": true
-    }
-  },
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "workspace",
+  "runServices": ["workspace", "postgres", "minio", "minio-init", "mailpit"],
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  "shutdownAction": "stopCompose",
+  "remoteUser": "node",
   "hostRequirements": {
     "cpus": 2,
     "memory": "8gb"
@@ -36,7 +34,6 @@
     }
   },
   "postCreateCommand": "bash .devcontainer/setup.sh",
-  "postStartCommand": "docker compose up -d",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -53,8 +50,5 @@
         "typescript.tsdk": "node_modules/typescript/lib"
       }
     }
-  },
-  "containerEnv": {
-    "COREPACK_ENABLE_DOWNLOAD_PROMPT": "0"
   }
 }

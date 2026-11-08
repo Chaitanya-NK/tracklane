@@ -1,0 +1,66 @@
+# Dev container stack for GitHub Codespaces / VS Code.
+# Every service shares the postgres container's network namespace, so the app reaches all of
+# them on localhost exactly like on a laptop (same .env), and no Docker-in-Docker is needed.
+name: tracklane-dev
+
+services:
+  workspace:
+    image: mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm
+    command: sleep infinity
+    volumes:
+      - ../..:/workspaces:cached
+    network_mode: service:postgres
+    environment:
+      TRACKLANE_SERVICES_MANAGED: "1"
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tracklane
+      POSTGRES_PASSWORD: tracklane
+      POSTGRES_DB: tracklane
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tracklane -d tracklane"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --address ":9000" --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: tracklane
+      MINIO_ROOT_PASSWORD: tracklane-secret
+    volumes:
+      - minio-data:/data
+    network_mode: service:postgres
+
+  minio-init:
+    image: minio/mc:latest
+    restart: "no"
+    network_mode: service:postgres
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://localhost:9000 tracklane tracklane-secret; do sleep 1; done;
+      mc mb --ignore-existing local/tracklane;
+      exit 0;
+      "
+
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    network_mode: service:postgres
+
+volumes:
+  postgres-data:
+  minio-data:
