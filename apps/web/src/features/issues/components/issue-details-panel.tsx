@@ -40,6 +40,7 @@ export interface IssueDetailsValue {
   status: { name: string; category: StatusCategory };
   assigneeId: string | null;
   parentId: string | null;
+  sprintId: string | null;
   labelIds: string[];
   dueDate: Date | null;
   estimate: number | null;
@@ -177,6 +178,41 @@ export function IssueDetailsPanel({
           disabled={disabled}
         />
       </Row>
+      {options.project.type === "scrum" ? (
+        <Row label="Sprint" htmlFor="f-sprint">
+          <Select
+            value={issue.sprintId ?? "backlog"}
+            onValueChange={(value) => {
+              const sprintId = value === "backlog" ? null : value;
+              const name = options.sprints.find((s) => s.id === sprintId)?.name;
+              void save({ sprintId }, sprintId ? `Moved to ${name}` : "Moved to the backlog");
+            }}
+            disabled={disabled}
+          >
+            <SelectTrigger
+              id="f-sprint"
+              size="sm"
+              className="w-full border-transparent shadow-none"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="backlog">Backlog</SelectItem>
+              {issue.sprintId && !options.sprints.some((s) => s.id === issue.sprintId) ? (
+                <SelectItem value={issue.sprintId} disabled>
+                  Completed sprint
+                </SelectItem>
+              ) : null}
+              {options.sprints.map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.name}
+                  {s.state === "active" ? " (active)" : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Row>
+      ) : null}
       <Row label="Priority" htmlFor="f-priority">
         <Select
           value={issue.priority}

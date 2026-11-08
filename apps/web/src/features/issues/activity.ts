@@ -13,6 +13,7 @@ export interface IssueSnapshot {
   estimate: number | null;
   parent: string | null;
   labels: string[];
+  sprint: string | null;
 }
 
 export interface ActivityChange {

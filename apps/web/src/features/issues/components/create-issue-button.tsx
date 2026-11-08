@@ -10,6 +10,7 @@ export function CreateIssueButton({
   projectKey,
   type,
   parentId,
+  sprintId,
   variant = "default",
   size = "default",
 }: {
@@ -17,6 +18,7 @@ export function CreateIssueButton({
   projectKey?: string;
   type?: IssueType;
   parentId?: string;
+  sprintId?: string | null;
   variant?: "default" | "outline" | "ghost";
   size?: "default" | "sm";
 }) {
@@ -25,7 +27,7 @@ export function CreateIssueButton({
     <Button
       variant={variant}
       size={size}
-      onClick={() => openCreateIssue({ projectKey, type, parentId })}
+      onClick={() => openCreateIssue({ projectKey, type, parentId, sprintId })}
     >
       <PlusIcon aria-hidden="true" /> {label}
     </Button>

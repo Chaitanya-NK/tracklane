@@ -51,6 +51,8 @@ export interface CreateIssueDefaults {
   projectKey?: string;
   type?: IssueType;
   parentId?: string;
+  /** Pre-select a sprint (null = backlog), e.g. from the backlog page. */
+  sprintId?: string | null;
 }
 
 interface Draft {
@@ -62,6 +64,7 @@ interface Draft {
   assigneeId: string | null;
   parentId: string | null;
   labelIds: string[];
+  sprintId: string | null;
   dueDate: string;
   estimate: string;
 }
@@ -75,6 +78,7 @@ const emptyDraft = (defaults: CreateIssueDefaults): Draft => ({
   assigneeId: null,
   parentId: defaults.parentId ?? null,
   labelIds: [],
+  sprintId: defaults.sprintId ?? null,
   dueDate: "",
   estimate: "",
 });
@@ -172,6 +176,7 @@ function CreateIssueForm({
       assigneeId: draft.assigneeId,
       parentId: ALLOWED_PARENT_TYPES[draft.type].length ? draft.parentId : null,
       labelIds: draft.labelIds,
+      sprintId: options.project.type === "scrum" ? draft.sprintId : null,
       dueDate: draft.dueDate || null,
       estimate: draft.estimate === "" ? null : Number(draft.estimate),
     });
@@ -358,6 +363,28 @@ function CreateIssueForm({
                       projectKey={options.project.key}
                       childType={draft.type}
                     />
+                  </Field>
+                ) : null}
+                {options.project.type === "scrum" ? (
+                  <Field className="sm:col-span-2">
+                    <FieldLabel htmlFor="ci-sprint">Sprint</FieldLabel>
+                    <Select
+                      value={draft.sprintId ?? "backlog"}
+                      onValueChange={(v) => update("sprintId", v === "backlog" ? null : v)}
+                    >
+                      <SelectTrigger id="ci-sprint" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="backlog">Backlog</SelectItem>
+                        {options.sprints.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.name}
+                            {s.state === "active" ? " (active)" : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </Field>
                 ) : null}
                 <Field>

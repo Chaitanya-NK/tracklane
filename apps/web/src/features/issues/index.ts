@@ -23,3 +23,8 @@ export {
   type IssueFilters,
 } from "./filters";
 export type { IssueFormOptions } from "./types";
+export {
+  IssueQuickViewHeader,
+  IssueQuickViewHeaderFallback,
+  IssueQuickViewSheet,
+} from "./components/issue-quick-view-sheet";

@@ -1,0 +1,24 @@
+import { formatIssueKey } from "@tracklane/core";
+import type { PlanningIssue } from "@/features/sprints/server";
+import type { PlanningCard } from "../types";
+
+/** Server row → client card. */
+export function toPlanningCard(issue: PlanningIssue): PlanningCard {
+  return {
+    id: issue.id,
+    key: formatIssueKey(issue.project.key, issue.number),
+    title: issue.title,
+    type: issue.type,
+    priority: issue.priority,
+    estimate: issue.estimate,
+    statusId: issue.status.id,
+    status: { name: issue.status.name, category: issue.status.category },
+    sprintId: issue.sprintId,
+    assignee: issue.assignee,
+    labels: issue.labels.map((l) => l.label),
+    parent: issue.parent
+      ? { key: formatIssueKey(issue.project.key, issue.parent.number), title: issue.parent.title }
+      : null,
+    dueDate: issue.dueDate ? issue.dueDate.toISOString().slice(0, 10) : null,
+  };
+}

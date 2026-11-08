@@ -1,6 +1,8 @@
 import "server-only";
 import {
   ALLOWED_PARENT_TYPES,
+  evenRanks,
+  rankBetween,
   AppError,
   formatIssueKey,
   ISSUE_TYPE_LABELS,
@@ -28,11 +30,13 @@ const snapshotSelect = {
   statusId: true,
   assigneeId: true,
   parentId: true,
+  sprintId: true,
   resolvedAt: true,
   project: { select: { key: true } },
   status: { select: { name: true, category: true } },
   assignee: { select: { name: true } },
   parent: { select: { number: true } },
+  sprint: { select: { name: true } },
   labels: { select: { label: { select: { id: true, name: true } } } },
   _count: { select: { children: true } },
 } satisfies Prisma.IssueSelect;
@@ -53,6 +57,7 @@ function snapshot(issue: IssueRow): IssueSnapshot {
     estimate: issue.estimate,
     parent: issue.parent ? formatIssueKey(issue.project.key, issue.parent.number) : null,
     labels: issue.labels.map((l) => l.label.name),
+    sprint: issue.sprint?.name ?? null,
   };
 }
 
@@ -72,6 +77,7 @@ async function validateReferences(
     assigneeId?: string | null;
     parentId?: string | null;
     labelIds?: string[];
+    sprintId?: string | null;
   },
 ) {
   if (refs.statusId) {
@@ -112,6 +118,16 @@ async function validateReferences(
       );
     }
   }
+  if (refs.sprintId) {
+    const sprint = await tx.sprint.findFirst({
+      where: { id: refs.sprintId, projectId: ctx.projectId },
+      select: { state: true },
+    });
+    if (!sprint) throw new AppError("validation_failed", "That sprint isn't in this project");
+    if (sprint.state === "completed") {
+      throw new AppError("validation_failed", "Issues can't be added to a completed sprint");
+    }
+  }
   if (refs.labelIds?.length) {
     const count = await tx.label.count({
       where: { id: { in: refs.labelIds }, projectId: ctx.projectId },
@@ -122,9 +138,10 @@ async function validateReferences(
   }
 }
 
-async function nextPosition(tx: Tx, statusId: string) {
-  const last = await tx.issue.aggregate({ where: { statusId }, _max: { position: true } });
-  return (last._max.position ?? 0) + 1000;
+/** Rank for a new issue: after everything else in the project. */
+async function nextPosition(tx: Tx, projectId: string) {
+  const last = await tx.issue.aggregate({ where: { projectId }, _max: { position: true } });
+  return rankBetween(last._max.position, undefined)!;
 }
 
 export interface CreateIssueInput {
@@ -141,6 +158,7 @@ export interface CreateIssueInput {
   dueDate?: string | null;
   estimate?: number | null;
   labelIds?: string[];
+  sprintId?: string | null;
 }
 
 export async function createIssue(input: CreateIssueInput) {
@@ -188,7 +206,8 @@ export async function createIssue(input: CreateIssueInput) {
         parentId: input.parentId ?? null,
         dueDate: input.dueDate ? new Date(`${input.dueDate}T00:00:00Z`) : null,
         estimate: input.estimate ?? null,
-        position: await nextPosition(tx, statusId),
+        position: await nextPosition(tx, project.id),
+        sprintId: input.sprintId ?? null,
         resolvedAt: status.category === "done" ? new Date() : null,
         labels: input.labelIds?.length
           ? { create: [...new Set(input.labelIds)].map((labelId) => ({ labelId })) }
@@ -213,6 +232,7 @@ export interface IssuePatch {
   dueDate?: string | null;
   estimate?: number | null;
   labelIds?: string[];
+  sprintId?: string | null;
 }
 
 export async function updateIssue(input: { issueId: string; userId: string; patch: IssuePatch }) {
@@ -238,22 +258,11 @@ export async function updateIssue(input: { issueId: string; userId: string; patc
         assigneeId: patch.assigneeId,
         parentId,
         labelIds: patch.labelIds,
+        sprintId: patch.sprintId,
       },
     );
 
-    let resolvedAt: Date | null | undefined;
-    let position: number | undefined;
-    if (patch.statusId && patch.statusId !== before.statusId) {
-      const status = await tx.workflowStatus.findUniqueOrThrow({
-        where: { id: patch.statusId },
-        select: { category: true },
-      });
-      const wasDone = before.status.category === "done";
-      const isDone = status.category === "done";
-      if (isDone && !wasDone) resolvedAt = new Date();
-      if (!isDone && wasDone) resolvedAt = null;
-      position = await nextPosition(tx, patch.statusId);
-    }
+    const resolvedAt = await resolvedAtFor(tx, before, patch.statusId);
 
     await tx.issue.update({
       where: { id: before.id },
@@ -263,7 +272,7 @@ export async function updateIssue(input: { issueId: string; userId: string; patc
         type: patch.type,
         priority: patch.priority,
         statusId: patch.statusId,
-        position,
+        sprintId: patch.sprintId,
         resolvedAt,
         assigneeId: patch.assigneeId,
         parentId: patch.parentId,
@@ -283,19 +292,115 @@ export async function updateIssue(input: { issueId: string; userId: string; patc
       },
     });
 
-    const after = await loadIssue(tx, before.id);
-    const changes = diffIssue(snapshot(before), snapshot(after));
-    if (changes.length) {
-      await tx.issueActivity.createMany({
-        data: changes.map((change) => ({
-          issueId: before.id,
-          actorId: input.userId,
-          action: "updated",
-          ...change,
-        })),
-      });
+    const changed = await recordChanges(tx, before, input.userId);
+    return { key: formatIssueKey(before.project.key, before.number), changed };
+  });
+}
+
+/** resolvedAt follows the status category: set when entering "done", cleared when leaving it. */
+async function resolvedAtFor(tx: Tx, before: IssueRow, statusId: string | undefined) {
+  if (!statusId || statusId === before.statusId) return undefined;
+  const status = await tx.workflowStatus.findUniqueOrThrow({
+    where: { id: statusId },
+    select: { category: true },
+  });
+  const wasDone = before.status.category === "done";
+  const isDone = status.category === "done";
+  if (isDone && !wasDone) return new Date();
+  if (!isDone && wasDone) return null;
+  return undefined;
+}
+
+/** Writes one history row per changed field. Returns how many fields changed. */
+async function recordChanges(tx: Tx, before: IssueRow, actorId: string) {
+  const after = await loadIssue(tx, before.id);
+  const changes = diffIssue(snapshot(before), snapshot(after));
+  if (changes.length) {
+    await tx.issueActivity.createMany({
+      data: changes.map((change) => ({
+        issueId: before.id,
+        actorId,
+        action: "updated",
+        ...change,
+      })),
+    });
+  }
+  return changes.length;
+}
+
+/** Renumbers every issue in the project by its current order (rare; keeps ranks precise). */
+async function rebalanceRanks(tx: Tx, projectId: string) {
+  const issues = await tx.issue.findMany({
+    where: { projectId },
+    orderBy: [{ position: "asc" }, { number: "asc" }],
+    select: { id: true },
+  });
+  const ranks = evenRanks(issues.length);
+  await Promise.all(
+    issues.map((issue, i) =>
+      tx.issue.update({ where: { id: issue.id }, data: { position: ranks[i] } }),
+    ),
+  );
+}
+
+export interface MoveIssueInput {
+  issueId: string;
+  userId: string;
+  /** New column on the board. */
+  statusId?: string;
+  /** New sprint; null moves it to the backlog. */
+  sprintId?: string | null;
+  /** Neighbours in the destination list after the drop (either may be missing). */
+  beforeId?: string | null;
+  afterId?: string | null;
+}
+
+/**
+ * Drag and drop: changes status and/or sprint, and places the issue between two neighbours.
+ * Ranks are project-wide, so the same order shows on the board and in the backlog.
+ */
+export async function moveIssue(input: MoveIssueInput) {
+  return db.$transaction(async (tx) => {
+    const before = await loadIssue(tx, input.issueId);
+    await assertWorkspacePermission(before.workspaceId, input.userId, "issues:update");
+    if (input.sprintId !== undefined && input.sprintId !== before.sprintId) {
+      await assertWorkspacePermission(before.workspaceId, input.userId, "sprints:manage");
     }
-    return { key: formatIssueKey(before.project.key, before.number), changed: changes.length };
+    await validateReferences(
+      tx,
+      { workspaceId: before.workspaceId, projectId: before.projectId, issueId: before.id },
+      { type: before.type, statusId: input.statusId, sprintId: input.sprintId },
+    );
+
+    const neighbourIds = [input.beforeId, input.afterId].filter((id): id is string => Boolean(id));
+    const loadNeighbours = () =>
+      tx.issue.findMany({
+        where: { id: { in: neighbourIds }, projectId: before.projectId },
+        select: { id: true, position: true },
+      });
+    let neighbours = await loadNeighbours();
+    const rankOf = (id: string | null | undefined) => neighbours.find((n) => n.id === id)?.position;
+    let position: number | null | undefined =
+      neighbourIds.length > 0
+        ? rankBetween(rankOf(input.beforeId), rankOf(input.afterId))
+        : undefined;
+    if (position === null) {
+      await rebalanceRanks(tx, before.projectId);
+      neighbours = await loadNeighbours();
+      position = rankBetween(rankOf(input.beforeId), rankOf(input.afterId));
+    }
+
+    await tx.issue.update({
+      where: { id: before.id },
+      data: {
+        statusId: input.statusId,
+        sprintId: input.sprintId,
+        position: position ?? undefined,
+        resolvedAt: await resolvedAtFor(tx, before, input.statusId),
+      },
+    });
+    await recordChanges(tx, before, input.userId);
+    return { key: formatIssueKey(before.project.key, before.number) };
   });
 }
 

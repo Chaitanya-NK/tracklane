@@ -22,6 +22,7 @@ const FIELD_LABELS: Record<string, string> = {
   estimate: "story points",
   parent: "parent",
   labels: "labels",
+  sprint: "sprint",
 };
 
 function Value({ children }: { children: string | null }) {

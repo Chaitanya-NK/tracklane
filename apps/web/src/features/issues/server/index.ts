@@ -12,3 +12,4 @@ export {
   type IssueListRow,
 } from "./queries";
 export { loadIssueFormOptions } from "./form-options";
+export { IssueView, IssueViewSkeleton } from "./issue-view";

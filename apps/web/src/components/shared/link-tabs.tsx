@@ -28,7 +28,7 @@ export function LinkTabs({
     tabs.find((t) => (t.prefix ? pathname.startsWith(t.href) : pathname === t.href))?.href ??
     tabs[0]?.href;
   return (
-    <Tabs value={active} className="flex-row items-center gap-3">
+    <Tabs value={active}>
       <TabsList aria-label={label}>
         {tabs.map((tab) => (
           <TabsTrigger key={tab.href} value={tab.href} asChild>

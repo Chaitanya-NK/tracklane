@@ -26,7 +26,7 @@ export default function WorkspaceLayout({ children, params }: LayoutProps<"/[wor
     <SidebarProvider>
       <CreateIssueProvider>
         <AppSidebar params={params} />
-        <SidebarInset>
+        <SidebarInset className="min-w-0">
           <AppHeader />
           <main className="mx-auto w-full max-w-7xl flex-1 p-4 md:p-6">
             <Suspense fallback={<PageFallback />}>

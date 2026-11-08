@@ -24,6 +24,7 @@ import {
   deleteAttachment,
   deleteComment,
   deleteIssue,
+  moveIssue,
   updateComment,
   updateIssue,
 } from "./service";
@@ -40,6 +41,7 @@ const issueFields = {
   dueDate: dueDateSchema,
   estimate: estimateSchema,
   labelIds: z.array(z.string()).max(20),
+  sprintId: z.string().nullable(),
 };
 
 export const createIssueAction = authActionClient
@@ -55,6 +57,7 @@ export const createIssueAction = authActionClient
       dueDate: issueFields.dueDate.optional(),
       estimate: issueFields.estimate.optional(),
       labelIds: issueFields.labelIds.optional(),
+      sprintId: issueFields.sprintId.optional(),
     }),
   )
   .action(async ({ parsedInput: { slug, projectKey, ...fields }, ctx }) => {
@@ -135,4 +138,21 @@ export const listProjectOptionsAction = authActionClient
     const { workspace } = await getWorkspaceAccess(parsedInput.slug);
     const projects = await listProjects(workspace.id);
     return projects.map((p) => ({ key: p.key, name: p.name }));
+  });
+
+/** Drag and drop on the board and backlog. */
+export const moveIssueAction = authActionClient
+  .inputSchema(
+    z.object({
+      issueId: z.string(),
+      statusId: z.string().optional(),
+      sprintId: z.string().nullable().optional(),
+      beforeId: z.string().nullable().optional(),
+      afterId: z.string().nullable().optional(),
+    }),
+  )
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await moveIssue({ ...parsedInput, userId: ctx.user.id });
+    refresh();
+    return result;
   });

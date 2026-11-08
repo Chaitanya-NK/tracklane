@@ -2,15 +2,16 @@ import "server-only";
 import { can, type WorkspaceRole } from "@tracklane/core";
 import { db } from "@tracklane/db";
 import { listAssignableUsers, listLabels, listStatuses } from "@/features/projects/server";
+import { listOpenSprints } from "@/features/sprints/server";
 import type { IssueFormOptions } from "../types";
 
 export async function loadIssueFormOptions(input: {
   workspaceId: string;
-  project: { id: string; key: string; name: string };
+  project: { id: string; key: string; name: string; type: "scrum" | "kanban" };
   role: WorkspaceRole;
   userId: string;
 }): Promise<IssueFormOptions> {
-  const [statuses, assignees, labels, parents] = await Promise.all([
+  const [statuses, assignees, labels, parents, sprints] = await Promise.all([
     listStatuses(input.project.id),
     listAssignableUsers(input.workspaceId),
     listLabels(input.project.id),
@@ -20,9 +21,16 @@ export async function loadIssueFormOptions(input: {
       take: 300,
       select: { id: true, number: true, title: true, type: true },
     }),
+    input.project.type === "scrum" ? listOpenSprints(input.project.id) : Promise.resolve([]),
   ]);
   return {
-    project: { id: input.project.id, key: input.project.key, name: input.project.name },
+    project: {
+      id: input.project.id,
+      key: input.project.key,
+      name: input.project.name,
+      type: input.project.type,
+    },
+    sprints,
     statuses: statuses.map(({ id, name, category }) => ({ id, name, category })),
     assignees,
     labels,
