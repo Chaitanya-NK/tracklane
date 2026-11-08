@@ -1,11 +1,16 @@
 import type { NextConfig } from "next";
 
-// In GitHub Codespaces the browser reaches the dev server through *.app.github.dev, which Next
-// would otherwise treat as a foreign origin (blocked dev assets and rejected Server Actions).
+// In GitHub Codespaces the browser reaches the dev server two ways: through
+// https://<name>-3000.app.github.dev, and through VS Code's port forward at http://localhost:3000.
+// The forward still sends the github.dev host in x-forwarded-host, so Next sees a mismatch with
+// the browser's origin and rejects Server Actions (and blocks dev assets) unless both hosts are
+// listed. These entries only apply in development.
+const isDev = process.env.NODE_ENV !== "production";
 const codespacesDomain = process.env.CODESPACE_NAME
   ? (process.env.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN ?? "app.github.dev")
   : undefined;
 const forwardedHosts = codespacesDomain ? [`*.${codespacesDomain}`] : [];
+const devHosts = isDev ? ["localhost:3000", "127.0.0.1:3000", ...forwardedHosts] : [];
 
 const nextConfig: NextConfig = {
   // Cache Components: data is dynamic by default; opt in to caching with "use cache".
@@ -17,9 +22,9 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["pg", "@prisma/adapter-pg"],
   poweredByHeader: false,
   devIndicators: { position: "bottom-right" },
-  allowedDevOrigins: forwardedHosts,
+  allowedDevOrigins: isDev ? ["localhost", "127.0.0.1", ...forwardedHosts] : [],
   experimental: {
-    serverActions: { allowedOrigins: forwardedHosts },
+    serverActions: { allowedOrigins: devHosts },
   },
   turbopack: {
     rules: {
