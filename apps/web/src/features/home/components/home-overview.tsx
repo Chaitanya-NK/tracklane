@@ -77,6 +77,12 @@ export function HomeOverview({
                           {phase.phase}. {phase.title}
                         </span>
                         <span className="block text-xs text-muted-foreground">{phase.summary}</span>
+                        {phase.carryOver?.length && !complete ? (
+                          <span className="mt-1 block text-xs text-muted-foreground">
+                            <span className="font-medium text-foreground/80">Also: </span>
+                            {phase.carryOver.join(" · ")}
+                          </span>
+                        ) : null}
                       </span>
                     </li>
                   );

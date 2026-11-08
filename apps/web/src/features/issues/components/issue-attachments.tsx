@@ -116,7 +116,8 @@ export function IssueAttachments({
               ref={input}
               type="file"
               multiple
-              className="sr-only"
+              className="hidden"
+              tabIndex={-1}
               aria-label="Upload attachments"
               onChange={(e) => {
                 if (e.target.files?.length) void upload(e.target.files);
