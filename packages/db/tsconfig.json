@@ -1,0 +1,5 @@
+{
+  "extends": "@tracklane/config/tsconfig/node.json",
+  "compilerOptions": { "module": "ESNext", "target": "ES2023" },
+  "include": ["src", "prisma.config.ts"]
+}

@@ -1,0 +1,21 @@
+// Tracklane database schema.
+// Phase 0 only sets up the toolchain; domain models (users, workspaces, projects, issues…)
+// arrive phase by phase with their own migrations.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Key/value settings for the whole installation (e.g. schema version, feature flags).
+model AppSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("app_settings")
+}
