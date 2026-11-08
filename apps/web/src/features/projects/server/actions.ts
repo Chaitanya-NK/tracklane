@@ -16,7 +16,14 @@ import { z } from "zod";
 import { getProjectAccess, getWorkspaceAccess } from "@/server/authz";
 import { authActionClient } from "@/server/safe-action";
 import { storage } from "@/server/storage";
-import { createLabel, createProject, deleteProject, updateProject } from "./service";
+import {
+  createLabel,
+  createProject,
+  deleteLabel,
+  deleteProject,
+  updateLabel,
+  updateProject,
+} from "./service";
 
 export const createProjectAction = authActionClient
   .inputSchema(
@@ -94,4 +101,37 @@ export const createLabelAction = authActionClient
       name: parsedInput.name,
       color: parsedInput.color,
     });
+  });
+
+export const updateLabelAction = authActionClient
+  .inputSchema(
+    z.object({
+      slug: z.string(),
+      labelId: z.string(),
+      name: labelNameSchema,
+      color: labelColorSchema,
+    }),
+  )
+  .action(async ({ parsedInput, ctx }) => {
+    const { workspace } = await getWorkspaceAccess(parsedInput.slug);
+    const label = await updateLabel({
+      ...parsedInput,
+      workspaceId: workspace.id,
+      userId: ctx.user.id,
+    });
+    refresh();
+    return label;
+  });
+
+export const deleteLabelAction = authActionClient
+  .inputSchema(z.object({ slug: z.string(), labelId: z.string() }))
+  .action(async ({ parsedInput, ctx }) => {
+    const { workspace } = await getWorkspaceAccess(parsedInput.slug);
+    const result = await deleteLabel({
+      labelId: parsedInput.labelId,
+      workspaceId: workspace.id,
+      userId: ctx.user.id,
+    });
+    refresh();
+    return result;
   });

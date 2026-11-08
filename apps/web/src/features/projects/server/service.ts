@@ -107,3 +107,46 @@ export async function createLabel(input: {
     throw error;
   }
 }
+
+async function labelInWorkspace(labelId: string, workspaceId: string) {
+  const label = await db.label.findFirst({
+    where: { id: labelId, project: { workspaceId } },
+    select: { id: true, projectId: true, name: true },
+  });
+  if (!label) throw new AppError("not_found", "Label not found");
+  return label;
+}
+
+export async function updateLabel(input: {
+  workspaceId: string;
+  labelId: string;
+  userId: string;
+  name: string;
+  color: LabelColor;
+}) {
+  await assertWorkspacePermission(input.workspaceId, input.userId, "issues:update");
+  await labelInWorkspace(input.labelId, input.workspaceId);
+  try {
+    return await db.label.update({
+      where: { id: input.labelId },
+      data: { name: input.name, color: input.color },
+      select: { id: true, name: true, color: true },
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      throw new AppError("conflict", `A label called "${input.name}" already exists`, {
+        field: "name",
+      });
+    }
+    throw error;
+  }
+}
+
+/** Deletes a label and removes it from every issue. Returns how many issues had it. */
+export async function deleteLabel(input: { workspaceId: string; labelId: string; userId: string }) {
+  await assertWorkspacePermission(input.workspaceId, input.userId, "projects:update");
+  const label = await labelInWorkspace(input.labelId, input.workspaceId);
+  const used = await db.issueLabel.count({ where: { labelId: label.id } });
+  await db.label.delete({ where: { id: label.id } });
+  return { name: label.name, used };
+}

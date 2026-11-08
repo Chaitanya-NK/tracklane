@@ -47,6 +47,7 @@ async function Settings({ params }: { params: Props["params"] }) {
             projectKey={project.key}
             labels={labels}
             canEdit={can(role, "issues:update")}
+            canDelete={can(role, "projects:update")}
           />
         </CardContent>
       </Card>

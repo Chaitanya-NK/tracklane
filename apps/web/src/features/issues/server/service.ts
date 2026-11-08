@@ -26,6 +26,7 @@ const snapshotSelect = {
   type: true,
   priority: true,
   dueDate: true,
+  startDate: true,
   estimate: true,
   statusId: true,
   assigneeId: true,
@@ -53,6 +54,7 @@ function snapshot(issue: IssueRow): IssueSnapshot {
     priority: PRIORITY_LABELS[issue.priority],
     status: issue.status.name,
     assignee: issue.assignee?.name ?? null,
+    startDate: toDateString(issue.startDate),
     dueDate: toDateString(issue.dueDate),
     estimate: issue.estimate,
     parent: issue.parent ? formatIssueKey(issue.project.key, issue.parent.number) : null,
@@ -155,6 +157,7 @@ export interface CreateIssueInput {
   statusId?: string;
   assigneeId?: string | null;
   parentId?: string | null;
+  startDate?: string | null;
   dueDate?: string | null;
   estimate?: number | null;
   labelIds?: string[];
@@ -175,6 +178,11 @@ export async function createIssue(input: CreateIssueInput) {
   const statusId = input.statusId ?? project.statuses[0]?.id;
   if (!statusId) throw new AppError("conflict", "This project has no workflow statuses");
 
+  if (input.startDate && input.dueDate && input.startDate > input.dueDate) {
+    throw new AppError("validation_failed", "The start date must be on or before the due date", {
+      field: "startDate",
+    });
+  }
   return db.$transaction(async (tx) => {
     await validateReferences(
       tx,
@@ -204,10 +212,22 @@ export async function createIssue(input: CreateIssueInput) {
         assigneeId: input.assigneeId ?? null,
         reporterId: input.userId,
         parentId: input.parentId ?? null,
+        startDate: input.startDate ? new Date(`${input.startDate}T00:00:00Z`) : null,
         dueDate: input.dueDate ? new Date(`${input.dueDate}T00:00:00Z`) : null,
         estimate: input.estimate ?? null,
         position: await nextPosition(tx, project.id),
-        sprintId: input.sprintId ?? null,
+        // A subtask lives in its parent's sprint unless one was given explicitly.
+        sprintId:
+          input.sprintId !== undefined
+            ? input.sprintId
+            : input.type === "subtask" && input.parentId
+              ? ((
+                  await tx.issue.findUnique({
+                    where: { id: input.parentId },
+                    select: { sprintId: true },
+                  })
+                )?.sprintId ?? null)
+              : null,
         resolvedAt: status.category === "done" ? new Date() : null,
         labels: input.labelIds?.length
           ? { create: [...new Set(input.labelIds)].map((labelId) => ({ labelId })) }
@@ -229,6 +249,7 @@ export interface IssuePatch {
   statusId?: string;
   assigneeId?: string | null;
   parentId?: string | null;
+  startDate?: string | null;
   dueDate?: string | null;
   estimate?: number | null;
   labelIds?: string[];
@@ -263,6 +284,14 @@ export async function updateIssue(input: { issueId: string; userId: string; patc
     );
 
     const resolvedAt = await resolvedAtFor(tx, before, patch.statusId);
+    const nextStart =
+      patch.startDate !== undefined ? patch.startDate : toDateString(before.startDate);
+    const nextDue = patch.dueDate !== undefined ? patch.dueDate : toDateString(before.dueDate);
+    if (nextStart && nextDue && nextStart > nextDue) {
+      throw new AppError("validation_failed", "The start date must be on or before the due date", {
+        field: "startDate",
+      });
+    }
 
     await tx.issue.update({
       where: { id: before.id },
@@ -277,6 +306,12 @@ export async function updateIssue(input: { issueId: string; userId: string; patc
         assigneeId: patch.assigneeId,
         parentId: patch.parentId,
         estimate: patch.estimate,
+        startDate:
+          patch.startDate === undefined
+            ? undefined
+            : patch.startDate
+              ? new Date(`${patch.startDate}T00:00:00Z`)
+              : null,
         dueDate:
           patch.dueDate === undefined
             ? undefined
@@ -292,6 +327,9 @@ export async function updateIssue(input: { issueId: string; userId: string; patc
       },
     });
 
+    if (patch.sprintId !== undefined && patch.sprintId !== before.sprintId) {
+      await moveSubtasksWithParent(tx, before.id, patch.sprintId, input.userId);
+    }
     const changed = await recordChanges(tx, before, input.userId);
     return { key: formatIssueKey(before.project.key, before.number), changed };
   });
@@ -326,6 +364,33 @@ async function recordChanges(tx: Tx, before: IssueRow, actorId: string) {
     });
   }
   return changes.length;
+}
+
+/**
+ * Subtasks belong to their parent's sprint (as in Jira): when a parent moves between sprints
+ * or to the backlog, its subtasks move with it, each with a history entry.
+ */
+async function moveSubtasksWithParent(
+  tx: Tx,
+  parentId: string,
+  sprintId: string | null,
+  actorId: string,
+) {
+  const subtasks = await tx.issue.findMany({
+    where: {
+      parentId,
+      type: "subtask",
+      NOT: { sprintId },
+      // Work recorded in a completed sprint stays there (it's that sprint's history).
+      OR: [{ sprintId: null }, { sprint: { state: { not: "completed" } } }],
+    },
+    select: { id: true },
+  });
+  for (const subtask of subtasks) {
+    const before = await loadIssue(tx, subtask.id);
+    await tx.issue.update({ where: { id: subtask.id }, data: { sprintId } });
+    await recordChanges(tx, before, actorId);
+  }
 }
 
 /** Renumbers every issue in the project by its current order (rare; keeps ranks precise). */
@@ -399,6 +464,9 @@ export async function moveIssue(input: MoveIssueInput) {
         resolvedAt: await resolvedAtFor(tx, before, input.statusId),
       },
     });
+    if (input.sprintId !== undefined && input.sprintId !== before.sprintId) {
+      await moveSubtasksWithParent(tx, before.id, input.sprintId, input.userId);
+    }
     await recordChanges(tx, before, input.userId);
     return { key: formatIssueKey(before.project.key, before.number) };
   });

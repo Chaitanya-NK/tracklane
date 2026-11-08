@@ -13,3 +13,4 @@ export {
 } from "./queries";
 export { loadIssueFormOptions } from "./form-options";
 export { IssueView, IssueViewSkeleton } from "./issue-view";
+export { deleteIssue, updateIssue } from "./service";

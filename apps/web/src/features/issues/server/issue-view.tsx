@@ -225,6 +225,7 @@ export async function IssueView({
                   parentId: issue.parent?.id ?? null,
                   sprintId: issue.sprintId,
                   labelIds: issue.labels.map((l) => l.label.id),
+                  startDate: issue.startDate,
                   dueDate: issue.dueDate,
                   estimate: issue.estimate,
                   reporter: issue.reporter,

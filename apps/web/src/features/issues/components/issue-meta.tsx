@@ -49,9 +49,10 @@ export function IssueTypeIcon({
         tone,
         className,
       )}
+      aria-hidden={tooltip ? undefined : true}
     >
       <Icon className="size-3" aria-hidden="true" strokeWidth={2.5} />
-      <span className="sr-only">{ISSUE_TYPE_LABELS[type]}</span>
+      {tooltip ? <span className="sr-only">{ISSUE_TYPE_LABELS[type]}</span> : null}
     </span>
   );
   if (!tooltip) return glyph;
@@ -82,9 +83,12 @@ export function PriorityIcon({
 }) {
   const { icon: Icon, className: tone } = PRIORITY_STYLE[priority];
   const glyph = (
-    <span className={cn("inline-flex shrink-0", tone, className)}>
+    <span
+      className={cn("inline-flex shrink-0", tone, className)}
+      aria-hidden={tooltip ? undefined : true}
+    >
       <Icon className="size-4" aria-hidden="true" strokeWidth={2.5} />
-      <span className="sr-only">{PRIORITY_LABELS[priority]} priority</span>
+      {tooltip ? <span className="sr-only">{PRIORITY_LABELS[priority]} priority</span> : null}
     </span>
   );
   if (!tooltip) return glyph;

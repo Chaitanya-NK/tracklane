@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getWorkspaceAccess } from "@/server/authz";
 import { authActionClient } from "@/server/safe-action";
+import { getDefaultWorkspaceSlug } from "./queries";
 import { createWorkspace, deleteWorkspace, updateWorkspace } from "./service";
 
 export const createWorkspaceAction = authActionClient
@@ -44,3 +45,12 @@ export const deleteWorkspaceAction = authActionClient
     });
     redirect("/");
   });
+
+/**
+ * Where to go after signing in when no callback URL was given: the last workspace, or
+ * onboarding. Asking here avoids a client navigation to "/" that only redirects.
+ */
+export const homePathAction = authActionClient.action(async ({ ctx }) => {
+  const slug = await getDefaultWorkspaceSlug(ctx.user.id);
+  return slug ? `/${slug}` : "/onboarding";
+});

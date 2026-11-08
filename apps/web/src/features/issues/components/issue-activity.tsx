@@ -19,6 +19,7 @@ const FIELD_LABELS: Record<string, string> = {
   status: "status",
   assignee: "assignee",
   dueDate: "due date",
+  startDate: "start date",
   estimate: "story points",
   parent: "parent",
   labels: "labels",

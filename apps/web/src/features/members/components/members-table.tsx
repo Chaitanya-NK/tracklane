@@ -165,6 +165,7 @@ export function MembersTable({
   actorRole: WorkspaceRole;
 }) {
   const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
+  const ownerCount = members.filter((m) => m.role === "owner").length;
 
   return (
     <div className="rounded-lg border">
@@ -182,7 +183,9 @@ export function MembersTable({
         <TableBody>
           {members.map((member) => {
             const isSelf = member.user.id === currentUserId;
-            const removable = isSelf || canRemoveMember(actorRole, member.role);
+            const lastOwner = member.role === "owner" && ownerCount === 1;
+            // The last owner can't leave (someone must own the workspace); hide the option.
+            const removable = isSelf ? !lastOwner : canRemoveMember(actorRole, member.role);
             return (
               <TableRow key={member.id}>
                 <TableCell>

@@ -24,7 +24,8 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (hasSession && matches(pathname, GUEST_ONLY_PATHS)) {
+  // Only page loads: Server Actions posted from these pages (e.g. after signing in) must pass.
+  if (hasSession && request.method === "GET" && matches(pathname, GUEST_ONLY_PATHS)) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 

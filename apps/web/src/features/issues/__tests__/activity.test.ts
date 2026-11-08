@@ -8,6 +8,7 @@ const base: IssueSnapshot = {
   priority: "High",
   status: "To Do",
   assignee: null,
+  startDate: null,
   dueDate: null,
   estimate: null,
   parent: null,

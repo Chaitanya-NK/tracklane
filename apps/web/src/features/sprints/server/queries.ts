@@ -37,7 +37,8 @@ export async function getBacklog(projectId: string) {
     db.issue.findMany({
       where: {
         projectId,
-        type: { not: "epic" },
+        // Epics plan across sprints; subtasks travel with their parent. Neither is a backlog row.
+        type: { notIn: ["epic", "subtask"] },
         OR: [{ sprintId: null }, { sprint: { state: { in: ["active", "planned"] } } }],
       },
       orderBy: [{ position: "asc" }, { number: "asc" }],

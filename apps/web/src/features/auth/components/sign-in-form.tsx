@@ -17,6 +17,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { homePathAction } from "@/features/workspaces/server/actions";
 import { authClient } from "@/lib/auth-client";
 import { safeCallbackUrl } from "@/lib/safe-redirect";
 import { signInSchema } from "../schemas";
@@ -43,7 +44,9 @@ export function SignInForm({ providers }: { providers: ("github" | "google")[] }
       });
       return;
     }
-    router.replace(callbackUrl as Route);
+    // Without an explicit destination, ask the server for the user's home directly.
+    const destination = callbackUrl === "/" ? ((await homePathAction())?.data ?? "/") : callbackUrl;
+    router.replace(destination as Route);
     router.refresh();
   }
 

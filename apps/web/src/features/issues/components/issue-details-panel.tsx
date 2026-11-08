@@ -42,6 +42,7 @@ export interface IssueDetailsValue {
   parentId: string | null;
   sprintId: string | null;
   labelIds: string[];
+  startDate: Date | null;
   dueDate: Date | null;
   estimate: number | null;
   reporter: { name: string; image: string | null } | null;
@@ -248,6 +249,23 @@ export function IssueDetailsPanel({
         ) : (
           typeSelect
         )}
+      </Row>
+      <Row label="Start date" htmlFor="f-start">
+        <DatePicker
+          id="f-start"
+          variant="ghost"
+          placeholder="None"
+          value={toDateInputValue(issue.startDate) || null}
+          disabled={disabled}
+          onChange={(startDate) =>
+            save(
+              { startDate },
+              startDate
+                ? `Start date set to ${format(parseDateValue(startDate)!, "d MMM yyyy")}`
+                : "Start date cleared",
+            )
+          }
+        />
       </Row>
       <Row label="Due date" htmlFor="f-due">
         <DatePicker

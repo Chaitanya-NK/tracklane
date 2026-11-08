@@ -9,6 +9,7 @@ export interface IssueSnapshot {
   priority: string;
   status: string;
   assignee: string | null;
+  startDate: string | null;
   dueDate: string | null;
   estimate: number | null;
   parent: string | null;

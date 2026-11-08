@@ -81,6 +81,7 @@ export async function getIssueByKey(workspaceId: string, issueKey: string) {
       description: true,
       type: true,
       priority: true,
+      startDate: true,
       dueDate: true,
       estimate: true,
       resolvedAt: true,

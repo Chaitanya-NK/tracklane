@@ -65,6 +65,7 @@ interface Draft {
   parentId: string | null;
   labelIds: string[];
   sprintId: string | null;
+  startDate: string;
   dueDate: string;
   estimate: string;
 }
@@ -79,6 +80,7 @@ const emptyDraft = (defaults: CreateIssueDefaults): Draft => ({
   parentId: defaults.parentId ?? null,
   labelIds: [],
   sprintId: defaults.sprintId ?? null,
+  startDate: "",
   dueDate: "",
   estimate: "",
 });
@@ -177,6 +179,7 @@ function CreateIssueForm({
       parentId: ALLOWED_PARENT_TYPES[draft.type].length ? draft.parentId : null,
       labelIds: draft.labelIds,
       sprintId: options.project.type === "scrum" ? draft.sprintId : null,
+      startDate: draft.startDate || null,
       dueDate: draft.dueDate || null,
       estimate: draft.estimate === "" ? null : Number(draft.estimate),
     });
@@ -387,6 +390,15 @@ function CreateIssueForm({
                     </Select>
                   </Field>
                 ) : null}
+                <Field>
+                  <FieldLabel htmlFor="ci-start">Start date</FieldLabel>
+                  <DatePicker
+                    id="ci-start"
+                    placeholder="No start date"
+                    value={draft.startDate || null}
+                    onChange={(value) => update("startDate", value ?? "")}
+                  />
+                </Field>
                 <Field>
                   <FieldLabel htmlFor="ci-due">Due date</FieldLabel>
                   <DatePicker
