@@ -1,12 +1,18 @@
 import { can } from "@tracklane/core";
 import type { Metadata } from "next";
+import { Suspense } from "react";
+import { CardSkeleton } from "@/components/shared/skeletons";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DeleteWorkspaceDialog, WorkspaceGeneralForm } from "@/features/workspaces";
 import { getWorkspaceAccess } from "@/server/authz";
 
 export const metadata: Metadata = { title: "Settings" };
 
-export default async function GeneralSettingsPage({ params }: PageProps<"/[workspace]/settings">) {
+async function GeneralSettings({
+  params,
+}: {
+  params: PageProps<"/[workspace]/settings">["params"];
+}) {
   const { workspace: slug } = await params;
   const { workspace, role } = await getWorkspaceAccess(slug);
 
@@ -40,5 +46,13 @@ export default async function GeneralSettingsPage({ params }: PageProps<"/[works
         </Card>
       ) : null}
     </div>
+  );
+}
+
+export default function GeneralSettingsPage({ params }: PageProps<"/[workspace]/settings">) {
+  return (
+    <Suspense fallback={<CardSkeleton />}>
+      <GeneralSettings params={params} />
+    </Suspense>
   );
 }

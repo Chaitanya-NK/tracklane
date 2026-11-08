@@ -6,9 +6,8 @@ import {
   InboxIcon,
   UserIcon,
 } from "lucide-react";
-import { Suspense } from "react";
+import { type ReactNode, Suspense } from "react";
 import { EmptyState } from "@/components/shared/empty-state";
-import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,22 +21,14 @@ const stats = [
   { label: "Done this sprint", icon: CircleCheckIcon },
 ] as const;
 
-export function HomeOverview({
-  userName,
-  workspaceName,
-}: {
-  userName: string;
-  workspaceName: string;
-}) {
+/** The workspace home. `header` streams in separately because it reads the session. */
+export function HomeOverview({ header }: { header: ReactNode }) {
   const done = roadmap.filter((p) => p.phase <= CURRENT_PHASE).length;
   const percent = Math.round((done / roadmap.length) * 100);
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title={`Welcome, ${userName.split(" ")[0] || userName}`}
-        description={`Your assigned work, activity and sprint progress in ${workspaceName} will appear here.`}
-      />
+      {header}
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {stats.map((stat) => (

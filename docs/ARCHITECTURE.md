@@ -83,6 +83,25 @@ Repository / Prisma (packages/db)
 - **Cache Components** is on: data is dynamic by default. Anything that reads the request
   (cookies, headers, params, the database at request time) must sit inside `<Suspense>` or call
   `connection()` first. Cache explicitly with `"use cache"` + `cacheTag`.
+- **Instant navigation:** on a client navigation only the segments below the shared layout
+  re-render, so a `<Suspense>` in a parent layout does not cover the page. A page must not
+  `await` `params`, the session or the database at its top level. Render the static frame
+  (headings, tabs, cards) directly and put each data section in its own `<Suspense>` with a
+  skeleton from `components/shared/skeletons.tsx`:
+
+  ```tsx
+  export default function Page({ params }: PageProps<"/[workspace]/x">) {
+    return (
+      <Suspense fallback={<CardSkeleton />}>
+        <XContent params={params} />
+      </Suspense>
+    );
+  }
+  ```
+
+  In development, Next validates this and reports "encountered uncached data during a
+  navigation" for any page that blocks.
+
 - `typedRoutes` is on: `href` values are type-checked.
 - Read `apps/web/node_modules/next/dist/docs/` for framework details — APIs differ from older
   versions.

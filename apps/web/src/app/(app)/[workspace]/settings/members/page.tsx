@@ -1,14 +1,18 @@
 import { can, invitableRoles } from "@tracklane/core";
 import type { Metadata } from "next";
+import { Suspense } from "react";
+import { HeadingSkeleton, TableSkeleton } from "@/components/shared/skeletons";
 import { InvitationsTable, InviteMembersDialog, MembersTable } from "@/features/members";
 import { listMembers, listPendingInvitations } from "@/features/members/server";
 import { getWorkspaceAccess } from "@/server/authz";
 
 export const metadata: Metadata = { title: "Members" };
 
-export default async function MembersSettingsPage({
+async function MembersSettings({
   params,
-}: PageProps<"/[workspace]/settings/members">) {
+}: {
+  params: PageProps<"/[workspace]/settings/members">["params"];
+}) {
   const { workspace: slug } = await params;
   const { user, workspace, role } = await getWorkspaceAccess(slug);
   const canInvite = can(role, "members:invite");
@@ -67,5 +71,22 @@ export default async function MembersSettingsPage({
         </section>
       ) : null}
     </div>
+  );
+}
+
+export default function MembersSettingsPage({
+  params,
+}: PageProps<"/[workspace]/settings/members">) {
+  return (
+    <Suspense
+      fallback={
+        <div className="space-y-3">
+          <HeadingSkeleton />
+          <TableSkeleton />
+        </div>
+      }
+    >
+      <MembersSettings params={params} />
+    </Suspense>
   );
 }
