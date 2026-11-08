@@ -117,6 +117,19 @@ Repository / Prisma (packages/db)
   section) must show their toast after `await executeAsync(...)`, not in `onSuccess`, which
   never runs once the component has unmounted.
 
+## Search, filters and views
+
+- **TQL** (see [TQL.md](TQL.md)) is parsed in `@tracklane/core` and compiled to Prisma in
+  `features/search/compile.ts`. The Filters page runs it, saves it (private or shared, with
+  per-user stars), bulk-edits results through the normal `updateIssue` path (so permissions
+  and history apply) and exports CSV from `/api/search/export` (formula-safe).
+- **Timeline** (`features/timeline`) draws epics and their children from `startDate`/`dueDate`;
+  dragging calls `updateIssueAction`. Date maths is in `timeline/math.ts` (tested).
+- **Calendar** (`features/calendar`) shows a month of due dates; dropping a card changes the
+  due date, dropping on "Unscheduled" clears it.
+- Subtasks follow their parent between sprints (except out of completed sprints) and don't
+  appear as backlog rows.
+
 ## Next.js 16 specifics
 
 - **Cache Components** is on: data is dynamic by default. Anything that reads the request

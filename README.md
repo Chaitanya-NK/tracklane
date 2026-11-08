@@ -4,7 +4,7 @@ A self-hostable, Jira-style project management platform — boards, backlogs, sp
 reports, docs, automation and a REST API — built with **Next.js 16**, **shadcn/ui**, **Prisma 7**
 and **PostgreSQL**. Everything runs on free, open-source software.
 
-> **Status:** Phase 3 (boards, backlog & sprints) of 12. See [the roadmap](#roadmap).
+> **Status:** Phase 4 (views & search) of 12. See [the roadmap](#roadmap).
 
 ## Run it in GitHub Codespaces (recommended)
 
@@ -18,8 +18,8 @@ and **PostgreSQL**. Everything runs on free, open-source software.
    ```
 
 4. Open the **Ports** tab → port **3000** (Tracklane web). Port **8025** is the dev email inbox.
-5. Sign in with the seeded demo account — **demo@tracklane.dev** / **tracklane-demo** — or create
-   your own account. The demo workspace has a **Web Platform** Scrum project with an active sprint, a planned
+5. Sign in with the seeded demo account — **demo@tracklane.dev** / **tracklane-demo** (owner) or
+   **priya@tracklane.dev** / **tracklane-demo** (member) — or create your own account. The demo workspace has a **Web Platform** Scrum project with an active sprint, a planned
    sprint and sample issues.
    Press **C** anywhere to create an issue.
 
