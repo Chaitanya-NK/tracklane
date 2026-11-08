@@ -20,6 +20,8 @@ export const PERMISSIONS = [
   "issues:update",
   "issues:delete",
   "comments:create",
+  /** Create, edit, start, complete and delete sprints. */
+  "sprints:manage",
   /** Edit or delete other people's comments (everyone can manage their own). */
   "comments:moderate",
 ] as const;
@@ -32,6 +34,7 @@ const MEMBER: Permission[] = [
   "issues:create",
   "issues:update",
   "comments:create",
+  "sprints:manage",
 ];
 const ADMIN: Permission[] = [
   ...MEMBER,

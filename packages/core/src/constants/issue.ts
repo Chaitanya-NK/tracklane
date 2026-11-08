@@ -18,3 +18,6 @@ export type ProjectType = (typeof PROJECT_TYPES)[number];
 
 export const WORKSPACE_ROLES = ["owner", "admin", "member", "viewer", "guest"] as const;
 export type WorkspaceRole = (typeof WORKSPACE_ROLES)[number];
+
+export const SPRINT_STATES = ["planned", "active", "completed"] as const;
+export type SprintState = (typeof SPRINT_STATES)[number];

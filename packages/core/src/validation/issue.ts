@@ -46,3 +46,6 @@ export const commentBodySchema = z
   .trim()
   .min(1, "Write something first")
   .max(20_000, "That's too long (20,000 characters max)");
+
+export const sprintNameSchema = z.string().trim().min(1, "Give the sprint a name").max(80);
+export const sprintGoalSchema = z.string().trim().max(1000, "Keep the goal under 1,000 characters");
