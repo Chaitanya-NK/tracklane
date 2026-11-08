@@ -25,6 +25,7 @@
     "@tracklane/config": "workspace:*",
     "@types/node": "^22.0.0",
     "@types/pg": "^8.15.0",
+    "better-auth": "1.7.18",
     "dotenv": "^17.0.0",
     "eslint": "^9.39.0",
     "prisma": "^7.0.0",
