@@ -10,7 +10,7 @@ and **PostgreSQL**. Everything runs on free, open-source software.
 
 1. On GitHub, click **Code → Codespaces → Create codespace on main**.
 2. Wait for setup to finish (first time ≈ 3–5 minutes). It installs dependencies, starts
-   Postgres / MinIO / Mailpit in Docker, runs migrations and seeds the database.
+   Postgres and Mailpit in Docker, runs migrations and seeds the database.
 3. In the terminal run:
 
    ```bash
@@ -29,7 +29,7 @@ Requirements: Node 22+, pnpm 10 (`corepack enable`), Docker.
 ```bash
 cp .env.example .env
 pnpm install
-pnpm db:up            # Postgres (pgvector), MinIO, Mailpit
+pnpm db:up            # Postgres (pgvector), Mailpit
 pnpm db:generate
 pnpm db:migrate       # applies migrations
 pnpm db:seed
@@ -44,7 +44,6 @@ pnpm dev              # web :3000, realtime :4001, worker
 | `@tracklane/realtime` | 4001 | socket.io server — live board updates and presence           |
 | `@tracklane/worker`   | —    | pg-boss jobs — SLA timers, automation, emails, AI embeddings |
 | Postgres + pgvector   | 5432 | Primary database                                             |
-| MinIO                 | 9000 | S3-compatible file storage (console on 9001)                 |
 | Mailpit               | 8025 | Catches every outgoing email in development                  |
 
 Health checks: `GET /api/health` (web) and `GET :4001/health` (realtime).

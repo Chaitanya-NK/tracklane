@@ -2,7 +2,7 @@
   "name": "Tracklane",
   "dockerComposeFile": "docker-compose.yml",
   "service": "workspace",
-  "runServices": ["workspace", "postgres", "minio", "minio-init", "mailpit"],
+  "runServices": ["workspace", "postgres", "mailpit"],
   "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
   "shutdownAction": "stopCompose",
   "remoteUser": "node",
@@ -10,7 +10,7 @@
     "cpus": 2,
     "memory": "8gb"
   },
-  "forwardPorts": [3000, 4001, 5432, 8025, 9001],
+  "forwardPorts": [3000, 4001, 5432, 8025],
   "portsAttributes": {
     "3000": {
       "label": "Tracklane web",
@@ -26,10 +26,6 @@
     },
     "8025": {
       "label": "Mailpit (dev inbox)",
-      "onAutoForward": "silent"
-    },
-    "9001": {
-      "label": "MinIO console",
       "onAutoForward": "silent"
     }
   },
