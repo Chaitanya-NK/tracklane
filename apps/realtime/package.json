@@ -1,0 +1,29 @@
+{
+  "name": "@tracklane/realtime",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Realtime server: live board updates and presence (socket.io), collaborative docs (Hocuspocus, Phase 9).",
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=../../.env src/index.ts",
+    "start": "tsx --env-file-if-exists=../../.env src/index.ts",
+    "lint": "eslint .",
+    "typecheck": "tsc",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@tracklane/core": "workspace:*",
+    "pino": "^10.0.0",
+    "socket.io": "^4.8.0",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@tracklane/config": "workspace:*",
+    "@types/node": "^22.0.0",
+    "eslint": "^9.39.0",
+    "pino-pretty": "^13.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "vitest": "^4.0.0"
+  }
+}

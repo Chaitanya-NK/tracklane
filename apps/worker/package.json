@@ -1,0 +1,30 @@
+{
+  "name": "@tracklane/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Background jobs (SLA timers, automations, emails, AI embeddings) on pg-boss.",
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=../../.env src/index.ts",
+    "start": "tsx --env-file-if-exists=../../.env src/index.ts",
+    "lint": "eslint .",
+    "typecheck": "tsc",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@tracklane/core": "workspace:*",
+    "@tracklane/db": "workspace:*",
+    "pg-boss": "^11.0.0",
+    "pino": "^10.0.0",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@tracklane/config": "workspace:*",
+    "@types/node": "^22.0.0",
+    "eslint": "^9.39.0",
+    "pino-pretty": "^13.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "vitest": "^4.0.0"
+  }
+}

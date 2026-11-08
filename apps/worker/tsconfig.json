@@ -1,0 +1,4 @@
+{
+  "extends": "@tracklane/config/tsconfig/node.json",
+  "include": ["src"]
+}
