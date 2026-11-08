@@ -117,6 +117,31 @@ Repository / Prisma (packages/db)
   section) must show their toast after `await executeAsync(...)`, not in `onSuccess`, which
   never runs once the component has unmounted.
 
+## Workflow, approvals and custom fields
+
+- **Workflow** (`features/workflow`). Statuses are per project (CRUD, reorder, delete with
+  "move issues to"). `projects.restrict_transitions` off = any move allowed; on = only rows in
+  `workflow_transitions`. Turning it on writes out every pair as allowed first, so nothing
+  gets stuck; new statuses start connected both ways. Rules are evaluated by `decideTransition`
+  in `@tracklane/core/workflow` (pure, tested).
+- **The gate.** Every status change — details panel, board drag, bulk edit — goes through
+  `gateStatusChange` inside the issue transaction (`updateIssue`/`moveIssue`). It throws for a
+  blocked move, and for a transition that needs approval files an `approval_requests` row and
+  leaves the status alone (the rest of the patch still applies). People who could approve the
+  move make it directly. Clients grey out blocked targets with `allowedTargets`.
+- **Approvals.** One pending request per issue. Approving claims the row (`updateMany … where
+state = pending`, so two approvers can't both decide) and then applies the status through
+  `updateIssue({ approved: true })`; a failure reopens the request. Approver roles are minimums.
+- **Custom fields** (`features/custom-fields`). Defined per project; values live in
+  `issue_field_values` (one typed column per kind, `option_ids` for selects). Empty values are
+  not stored, so TQL's `IS EMPTY` is "no row". `writeFieldValues` validates per type, enforces
+  required fields on create and records history. The issue UI uses
+  `features/issues/components/custom-field-input.tsx` for every type.
+- **Board swimlanes** (`features/board/lanes.ts`). Droppable ids are `lane::status`; dropping
+  into another lane sends that lane's field (assignee, priority or epic) with the move.
+- **Kanban backlog.** `projects.backlog_status_id` takes a To do status off the board and into
+  the Backlog tab.
+
 ## Search, filters and views
 
 - **TQL** (see [TQL.md](TQL.md)) is parsed in `@tracklane/core` and compiled to Prisma in

@@ -95,7 +95,7 @@ Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before adding features.
 | 2   | Projects & issues        | Projects, issue detail, comments, activity, labels, attachments     |
 | 3   | Board & backlog          | Drag-and-drop board, sprints, swimlanes, quick view, shortcuts      |
 | 4   | Views & search           | List view, saved views, TQL search, calendar, timeline, ⌘K          |
-| 5   | Workflow & fields        | Workflow editor, custom fields and issue types, approvals           |
+| 5   | Workflow & fields        | Workflow editor, approvals, custom fields, TQL functions, swimlanes |
 | 6   | Notifications & realtime | Inbox, email, push, live updates, presence                          |
 | 7   | Reports & time           | Burndown, velocity, CFD, dashboards, workload, timesheets, SLAs     |
 | 8   | Planning tools           | Releases, goals, automation, dependency graph, recurring issues     |
