@@ -48,6 +48,8 @@ model User {
   comments          Comment[]
   attachments       Attachment[]
   issueActivities   IssueActivity[]
+  savedFilters      SavedFilter[]
+  filterFavorites   FilterFavorite[]
 
   @@map("users")
 }
@@ -124,11 +126,12 @@ model Workspace {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  createdBy   User?                 @relation("WorkspaceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  members     WorkspaceMember[]
-  invitations WorkspaceInvitation[]
-  projects    Project[]
-  issues      Issue[]
+  createdBy    User?                 @relation("WorkspaceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  members      WorkspaceMember[]
+  invitations  WorkspaceInvitation[]
+  projects     Project[]
+  issues       Issue[]
+  savedFilters SavedFilter[]
 
   @@map("workspaces")
 }
@@ -269,6 +272,8 @@ model Issue {
   reporterId  String?   @map("reporter_id")
   /// Epic for stories/tasks/bugs, or the parent of a subtask.
   parentId    String?   @map("parent_id")
+  /// Planned start (timeline). Due date is the planned end.
+  startDate   DateTime? @map("start_date") @db.Date
   dueDate     DateTime? @map("due_date") @db.Date
   /// Story points.
   estimate    Int?
@@ -418,4 +423,42 @@ model Sprint {
 
   @@index([projectId, state])
   @@map("sprints")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Saved filters
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A named TQL query. Private to its owner unless shared with the workspace.
+model SavedFilter {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  ownerId     String   @map("owner_id")
+  name        String
+  description String   @default("")
+  query       String
+  shared      Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  workspace Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  owner     User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  favorites FilterFavorite[]
+
+  @@index([workspaceId, ownerId])
+  @@map("saved_filters")
+}
+
+/// A user's starred filters (theirs or shared ones).
+model FilterFavorite {
+  filterId  String   @map("filter_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  filter SavedFilter @relation(fields: [filterId], references: [id], onDelete: Cascade)
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([filterId, userId])
+  @@index([userId])
+  @@map("filter_favorites")
 }

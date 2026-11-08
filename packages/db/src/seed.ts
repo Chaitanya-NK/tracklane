@@ -52,7 +52,7 @@ async function seedDemo() {
   await seedDemoProject(workspace.id, user.id);
 }
 
-/** A second person so assignment and comments look real. Can't sign in (no password). */
+/** A second person so assignment, comments and permissions can be tried from another account. */
 async function seedTeammate(workspaceId: string) {
   const user = await db.user.upsert({
     where: { email: "priya@tracklane.dev" },
@@ -69,6 +69,21 @@ async function seedTeammate(workspaceId: string) {
     update: {},
     create: { workspaceId, userId: user.id, role: "member" },
   });
+  const hasPassword = await db.account.findFirst({
+    where: { userId: user.id, providerId: "credential" },
+    select: { id: true },
+  });
+  if (!hasPassword) {
+    await db.account.create({
+      data: {
+        id: randomUUID(),
+        userId: user.id,
+        providerId: "credential",
+        accountId: user.id,
+        password: await hashPassword(DEMO_USER.password),
+      },
+    });
+  }
   return user;
 }
 
@@ -127,6 +142,7 @@ async function seedDemoProject(workspaceId: string, demoUserId: string) {
     labels?: string[];
     estimate?: number;
     due?: number;
+    start?: number;
     parent?: number;
     description?: string;
   };
@@ -136,6 +152,8 @@ async function seedDemoProject(workspaceId: string, demoUserId: string) {
       type: "epic",
       status: "In Progress",
       priority: "high",
+      start: -10,
+      due: 24,
       description: "Cut checkout drop-off by simplifying the flow to a single page.",
     },
     {
@@ -146,6 +164,7 @@ async function seedDemoProject(workspaceId: string, demoUserId: string) {
       assignee: demoUserId,
       labels: ["frontend"],
       estimate: 8,
+      start: -5,
       due: 4,
       parent: 1,
       description:
@@ -159,6 +178,8 @@ async function seedDemoProject(workspaceId: string, demoUserId: string) {
       assignee: priya.id,
       labels: ["backend"],
       estimate: 5,
+      start: 3,
+      due: 16,
       parent: 1,
     },
     {
@@ -169,6 +190,7 @@ async function seedDemoProject(workspaceId: string, demoUserId: string) {
       assignee: demoUserId,
       labels: ["backend", "customer"],
       estimate: 3,
+      start: -3,
       due: 1,
       parent: 1,
       description:
@@ -224,6 +246,16 @@ async function seedDemoProject(workspaceId: string, demoUserId: string) {
       priority: "lowest",
       labels: ["frontend"],
       estimate: 5,
+      parent: 11,
+    },
+    {
+      title: "Accessibility and theming",
+      type: "epic",
+      status: "To Do",
+      priority: "medium",
+      start: 20,
+      due: 50,
+      description: "Dark mode, contrast and keyboard support across the app.",
     },
   ];
 
@@ -243,9 +275,11 @@ async function seedDemoProject(workspaceId: string, demoUserId: string) {
         statusId: s.id,
         assigneeId: seed.assignee ?? null,
         reporterId: demoUserId,
-        parentId: seed.parent ? ids[seed.parent - 1] : null,
+        // Parents are usually created first; later ones are linked below.
+        parentId: seed.parent && ids[seed.parent - 1] ? ids[seed.parent - 1] : null,
         estimate: seed.estimate ?? null,
         dueDate: seed.due === undefined ? null : dateIn(seed.due),
+        startDate: seed.start === undefined ? null : dateIn(seed.start),
         position: number * 1000,
         resolvedAt: s.category === "done" ? new Date(Date.now() - 2 * day) : null,
         labels: seed.labels
@@ -257,7 +291,33 @@ async function seedDemoProject(workspaceId: string, demoUserId: string) {
     });
     ids.push(issue.id);
   }
+  for (const [index, seed] of issues.entries()) {
+    if (seed.parent && seed.parent > index + 1) {
+      await db.issue.update({
+        where: { id: ids[index]! },
+        data: { parentId: ids[seed.parent - 1]! },
+      });
+    }
+  }
   await db.project.update({ where: { id: project.id }, data: { issueCounter: issues.length } });
+  await db.savedFilter.createMany({
+    data: [
+      {
+        workspaceId,
+        ownerId: demoUserId,
+        name: "Open bugs in Web Platform",
+        description: "Every unresolved bug, worst first",
+        query: "project = WEB AND type = bug AND statusCategory != done ORDER BY priority DESC",
+        shared: true,
+      },
+      {
+        workspaceId,
+        ownerId: demoUserId,
+        name: "Due in the next 2 weeks",
+        query: "due <= 14d AND statusCategory != done ORDER BY due ASC",
+      },
+    ],
+  });
   await seedSprints(project.id, ids, dateIn);
 
   await db.comment.createMany({
@@ -283,7 +343,9 @@ async function main() {
     create: { key: "schema.phase", value: { phase: 1 } },
   });
   if (process.env.NODE_ENV !== "production") await seedDemo();
-  console.warn(`Seed complete. Demo login: ${DEMO_USER.email} / ${DEMO_USER.password}`);
+  console.warn(
+    `Seed complete. Demo logins (password ${DEMO_USER.password}): ${DEMO_USER.email} (owner), priya@tracklane.dev (member)`,
+  );
 }
 
 main()
