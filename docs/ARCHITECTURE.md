@@ -61,6 +61,23 @@ Repository / Prisma (packages/db)
   error format, server actions map it to form errors.
 - Long or scheduled work goes to the worker as a pg-boss job instead of running in a request.
 
+## Auth and access control
+
+- **Identity** is Better Auth (`server/auth`): email + password, optional GitHub/Google OAuth,
+  password reset by email. Sessions are cookie-based; `/api/auth/*` is Better Auth's handler.
+- `proxy.ts` does only an optimistic cookie check to redirect signed-out visitors. The real
+  check happens on the server: `getCurrentUser()` / `requireUser()`.
+- **Workspaces** are Tracklane's own models. Every workspace route lives under
+  `app/(app)/[workspace]`; its layout renders `WorkspaceGate` inside `<Suspense>`, which calls
+  `getWorkspaceAccess(slug)` (404 for non-members) before any page content renders.
+- **Roles and permissions** live in `@tracklane/core` (`can(role, permission)`,
+  `canAssignRole`, `canRemoveMember`). Services call `assertWorkspacePermission`, so the UI, the
+  REST API and jobs all enforce the same rules. The UI only hides controls; it never decides.
+- **Server Actions** use `authActionClient` (`server/safe-action.ts`). `result.serverError` is
+  `{ message, field? }`; forms put it on `field` when set.
+- Invitation links carry a random token; only its SHA-256 hash is stored. Accepting requires the
+  signed-in email to match the invited address.
+
 ## Next.js 16 specifics
 
 - **Cache Components** is on: data is dynamic by default. Anything that reads the request

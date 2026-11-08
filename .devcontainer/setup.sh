@@ -10,6 +10,19 @@ pnpm --version
 echo "▸ Creating .env from .env.example (if missing)"
 [ -f .env ] || cp .env.example .env
 
+# Add keys introduced by newer phases to an existing .env, without touching values already set.
+while IFS= read -r line; do
+  key="${line%%=*}"
+  [[ -z "$line" || "$line" == \#* || "$line" != *=* ]] && continue
+  grep -q "^${key}=" .env || echo "$line" >> .env
+done < .env.example
+
+if ! grep -q "^BETTER_AUTH_SECRET=..*" .env; then
+  echo "▸ Generating BETTER_AUTH_SECRET"
+  secret="$(node -e 'process.stdout.write(require("crypto").randomBytes(32).toString("base64"))')"
+  sed -i "s#^BETTER_AUTH_SECRET=.*#BETTER_AUTH_SECRET=${secret}#" .env
+fi
+
 # In Codespaces, point browser-facing URLs at the forwarded port domains.
 if [ -n "${CODESPACE_NAME:-}" ]; then
   DOMAIN="${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev}"

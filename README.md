@@ -4,7 +4,7 @@ A self-hostable, Jira-style project management platform — boards, backlogs, sp
 reports, docs, automation and a REST API — built with **Next.js 16**, **shadcn/ui**, **Prisma 7**
 and **PostgreSQL**. Everything runs on free, open-source software.
 
-> **Status:** Phase 0 (foundation) of 12. See [the roadmap](#roadmap).
+> **Status:** Phase 1 (auth & workspaces) of 12. See [the roadmap](#roadmap).
 
 ## Run it in GitHub Codespaces (recommended)
 
@@ -18,6 +18,15 @@ and **PostgreSQL**. Everything runs on free, open-source software.
    ```
 
 4. Open the **Ports** tab → port **3000** (Tracklane web). Port **8025** is the dev email inbox.
+5. Sign in with the seeded demo account — **demo@tracklane.dev** / **tracklane-demo** — or create
+   your own account.
+
+Already have a codespace from an earlier phase? Pull and re-run setup — it adds new `.env` keys
+(including a generated `BETTER_AUTH_SECRET`), applies migrations and re-seeds:
+
+```bash
+git pull && bash .devcontainer/setup.sh && pnpm dev
+```
 
 > Codespaces free quota (personal accounts): 120 core-hours/month ≈ 60 hours on the default
 > 2-core machine. Stop the codespace when you're done (**Codespaces → Stop**).
@@ -27,7 +36,7 @@ and **PostgreSQL**. Everything runs on free, open-source software.
 Requirements: Node 22+, pnpm 10 (`corepack enable`), Docker.
 
 ```bash
-cp .env.example .env
+cp .env.example .env   # then set BETTER_AUTH_SECRET (openssl rand -base64 32)
 pnpm install
 pnpm db:up            # Postgres (pgvector), Mailpit
 pnpm db:generate

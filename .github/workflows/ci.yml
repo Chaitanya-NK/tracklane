@@ -34,10 +34,17 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
-      - run: cp .env.example .env
+      - name: Create .env
+        run: |
+          cp .env.example .env
+          sed -i "s#^BETTER_AUTH_SECRET=.*#BETTER_AUTH_SECRET=$(openssl rand -base64 32)#" .env
       - run: pnpm install --frozen-lockfile
       - run: pnpm db:generate
       - run: pnpm --filter @tracklane/db migrate:deploy
+      - name: Check migrations match schema.prisma
+        # Exit code 2 means the schema has changes no migration covers.
+        run: pnpm --filter @tracklane/db exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
+      - run: pnpm db:seed
       - run: pnpm format:check
       - run: pnpm lint
       - run: pnpm typecheck
