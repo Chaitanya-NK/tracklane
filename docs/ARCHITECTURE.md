@@ -78,6 +78,25 @@ Repository / Prisma (packages/db)
 - Invitation links carry a random token; only its SHA-256 hash is stored. Accepting requires the
   signed-in email to match the invited address.
 
+## Projects and issues
+
+- A **project** has a key (`WEB`), its own workflow statuses and labels. Issues are numbered per
+  project (`WEB-12`): `createIssue` increments `projects.issue_counter` inside the transaction,
+  which row-locks the project so concurrent creates never share a number.
+- Issue pages live at `/<workspace>/issues/<KEY-N>`; the project list is
+  `/<workspace>/projects/<KEY>` with filters in the query string (`features/issues/filters.ts`).
+- Every change goes through `updateIssue`, which validates references (status in the project,
+  assignee is a non-guest member, parent type allowed by `ALLOWED_PARENT_TYPES`) and writes
+  one `issue_activities` row per changed field via the pure `diffIssue()`.
+- **Attachments** are stored through `server/storage` (local disk under `STORAGE_DIR` by
+  default; swap the driver for S3 later). Uploads go to `POST /api/issues/:id/attachments`;
+  downloads stream from `GET /api/attachments/:id` after a membership check. Only raster images
+  are served inline; everything else is a download with `nosniff` and a sandboxing CSP.
+- Markdown (descriptions, comments) renders with `components/shared/markdown.tsx`; raw HTML is
+  never rendered.
+- Next keeps visited routes mounted but hidden. Dialogs whose action redirects must close
+  themselves (`useAction(..., { onNavigation })`), or they reappear when the user navigates back.
+
 ## Next.js 16 specifics
 
 - **Cache Components** is on: data is dynamic by default. Anything that reads the request
