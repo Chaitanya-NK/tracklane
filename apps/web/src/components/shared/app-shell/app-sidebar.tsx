@@ -14,20 +14,24 @@ import {
 } from "@/components/ui/sidebar";
 import { CommandMenu } from "./command-menu";
 import { NavMain } from "./nav-main";
-import { UserNav } from "./user-nav";
-import { WorkspaceSwitcher } from "./workspace-switcher";
+import { UserNav, UserNavFallback } from "./user-nav";
+import { WorkspaceSwitcher, WorkspaceSwitcherFallback } from "./workspace-switcher";
 
-export function AppSidebar() {
+export function AppSidebar({ params }: { params: Promise<{ workspace: string }> }) {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <WorkspaceSwitcher />
+        <Suspense fallback={<WorkspaceSwitcherFallback />}>
+          <WorkspaceSwitcher params={params} />
+        </Suspense>
         <SidebarMenu>
           <SidebarMenuItem className="flex gap-1.5">
-            <CommandMenu />
+            <Suspense fallback={<SidebarMenuSkeleton showIcon width="80%" />}>
+              <CommandMenu />
+            </Suspense>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Create issue" disabled>
+            <SidebarMenuButton tooltip="Create issue (Phase 2)" disabled>
               <PlusIcon aria-hidden="true" />
               <span>Create issue</span>
             </SidebarMenuButton>
@@ -35,7 +39,7 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        {/* The active-link highlight reads the URL, so it streams in after the static shell. */}
+        {/* Links depend on the URL, so they stream in after the static shell. */}
         <Suspense
           fallback={
             <SidebarGroup>
@@ -49,7 +53,9 @@ export function AppSidebar() {
         </Suspense>
       </SidebarContent>
       <SidebarFooter>
-        <UserNav />
+        <Suspense fallback={<UserNavFallback />}>
+          <UserNav />
+        </Suspense>
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

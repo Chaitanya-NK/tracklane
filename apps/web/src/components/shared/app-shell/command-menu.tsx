@@ -1,7 +1,7 @@
 "use client";
 
 import { MoonIcon, SearchIcon, SunIcon } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -15,12 +15,13 @@ import {
 } from "@/components/ui/command";
 import { Kbd } from "@/components/ui/kbd";
 import { SidebarMenuButton } from "@/components/ui/sidebar";
-import { primaryNav } from "@/config/navigation";
+import { primaryNav, secondaryNav, workspacePath } from "@/config/navigation";
 
 /** ⌘K / Ctrl+K command palette. Issues, actions and AI search plug into this in later phases. */
 export function CommandMenu() {
   const [open, setOpen] = useState(false);
   const router = useRouter();
+  const { workspace } = useParams<{ workspace: string }>();
   const { setTheme } = useTheme();
 
   useEffect(() => {
@@ -60,8 +61,11 @@ export function CommandMenu() {
         <CommandList>
           <CommandEmpty>No results found.</CommandEmpty>
           <CommandGroup heading="Navigate">
-            {primaryNav.map((item) => (
-              <CommandItem key={item.href} onSelect={() => run(() => router.push(item.href))}>
+            {[...primaryNav, ...secondaryNav].map((item) => (
+              <CommandItem
+                key={item.segment}
+                onSelect={() => run(() => router.push(workspacePath(workspace, item.segment)))}
+              >
                 <item.icon aria-hidden="true" />
                 {item.title}
               </CommandItem>

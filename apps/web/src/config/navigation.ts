@@ -6,16 +6,23 @@ import {
   HomeIcon,
   LayoutDashboardIcon,
   type LucideIcon,
+  SettingsIcon,
   TargetIcon,
   UsersIcon,
 } from "lucide-react";
 
 export interface NavItem {
   title: string;
-  href: Route;
+  /** Path inside the workspace, without a leading slash ("" is the workspace home). */
+  segment: string;
   icon: LucideIcon;
   /** Phase in which the destination becomes functional; earlier it shows a "coming soon" page. */
   availableInPhase: number;
+}
+
+/** Builds a URL inside a workspace: workspacePath("acme", "projects") → "/acme/projects". */
+export function workspacePath(slug: string, segment = ""): Route {
+  return (segment ? `/${slug}/${segment}` : `/${slug}`) as Route;
 }
 
 /**
@@ -23,16 +30,23 @@ export interface NavItem {
  * Project-level navigation (board, backlog, timeline…) is added in Phase 2 when projects exist.
  */
 export const primaryNav: NavItem[] = [
-  { title: "For you", href: "/", icon: HomeIcon, availableInPhase: 0 },
-  { title: "Inbox", href: "/inbox", icon: BellIcon, availableInPhase: 6 },
-  { title: "Projects", href: "/projects", icon: FolderIcon, availableInPhase: 2 },
-  { title: "Goals", href: "/goals", icon: TargetIcon, availableInPhase: 8 },
-  { title: "Filters", href: "/filters", icon: FilterIcon, availableInPhase: 4 },
-  { title: "Dashboards", href: "/dashboards", icon: LayoutDashboardIcon, availableInPhase: 7 },
-  { title: "Teams", href: "/teams", icon: UsersIcon, availableInPhase: 7 },
+  { title: "For you", segment: "", icon: HomeIcon, availableInPhase: 0 },
+  { title: "Inbox", segment: "inbox", icon: BellIcon, availableInPhase: 6 },
+  { title: "Projects", segment: "projects", icon: FolderIcon, availableInPhase: 2 },
+  { title: "Goals", segment: "goals", icon: TargetIcon, availableInPhase: 8 },
+  { title: "Filters", segment: "filters", icon: FilterIcon, availableInPhase: 4 },
+  { title: "Dashboards", segment: "dashboards", icon: LayoutDashboardIcon, availableInPhase: 7 },
+  { title: "Teams", segment: "teams", icon: UsersIcon, availableInPhase: 7 },
 ];
 
+export const secondaryNav: NavItem[] = [
+  { title: "Settings", segment: "settings", icon: SettingsIcon, availableInPhase: 1 },
+];
+
+const allNav = [...primaryNav, ...secondaryNav];
+
+/** Matches a pathname like "/acme/projects/web" to its nav item. */
 export function findNavItem(pathname: string): NavItem | undefined {
-  if (pathname === "/") return primaryNav[0];
-  return primaryNav.find((item) => item.href !== "/" && pathname.startsWith(item.href));
+  const [, , first = ""] = pathname.split("/");
+  return allNav.find((item) => item.segment === first);
 }

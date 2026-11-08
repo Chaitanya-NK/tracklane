@@ -1,0 +1,71 @@
+import { can, invitableRoles } from "@tracklane/core";
+import type { Metadata } from "next";
+import { InvitationsTable, InviteMembersDialog, MembersTable } from "@/features/members";
+import { listMembers, listPendingInvitations } from "@/features/members/server";
+import { getWorkspaceAccess } from "@/server/authz";
+
+export const metadata: Metadata = { title: "Members" };
+
+export default async function MembersSettingsPage({
+  params,
+}: PageProps<"/[workspace]/settings/members">) {
+  const { workspace: slug } = await params;
+  const { user, workspace, role } = await getWorkspaceAccess(slug);
+  const canInvite = can(role, "members:invite");
+  const [members, invitations] = await Promise.all([
+    listMembers(workspace.id, user.id),
+    canInvite ? listPendingInvitations(workspace.id, user.id) : Promise.resolve([]),
+  ]);
+
+  return (
+    <div className="space-y-8">
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">Members</h2>
+            <p className="text-sm text-muted-foreground">
+              {members.length} {members.length === 1 ? "person has" : "people have"} access to{" "}
+              {workspace.name}.
+            </p>
+          </div>
+          {canInvite ? (
+            <InviteMembersDialog slug={workspace.slug} roles={invitableRoles(role)} />
+          ) : null}
+        </div>
+        <MembersTable
+          slug={workspace.slug}
+          workspaceName={workspace.name}
+          currentUserId={user.id}
+          actorRole={role}
+          members={members.map((m) => ({
+            id: m.id,
+            role: m.role,
+            joinedAt: m.createdAt.toISOString(),
+            user: m.user,
+          }))}
+        />
+      </section>
+
+      {canInvite && invitations.length > 0 ? (
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-lg font-semibold">Pending invitations</h2>
+            <p className="text-sm text-muted-foreground">
+              Invitations that haven&apos;t been accepted yet.
+            </p>
+          </div>
+          <InvitationsTable
+            slug={workspace.slug}
+            invitations={invitations.map((i) => ({
+              id: i.id,
+              email: i.email,
+              role: i.role,
+              invitedByName: i.invitedBy?.name ?? "A former member",
+              expiresAt: i.expiresAt.toISOString(),
+            }))}
+          />
+        </section>
+      ) : null}
+    </div>
+  );
+}

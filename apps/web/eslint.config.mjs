@@ -18,8 +18,9 @@ const eslintConfig = defineConfig([
         {
           patterns: [
             {
-              group: ["@/features/*/**"],
-              message: "Import a feature through its index.ts (e.g. @/features/home).",
+              group: ["@/features/*/*", "!@/features/*/server"],
+              message:
+                "Import a feature through @/features/<name> (client-safe) or @/features/<name>/server.",
             },
           ],
         },

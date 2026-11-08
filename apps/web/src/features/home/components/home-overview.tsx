@@ -22,15 +22,21 @@ const stats = [
   { label: "Done this sprint", icon: CircleCheckIcon },
 ] as const;
 
-export function HomeOverview() {
+export function HomeOverview({
+  userName,
+  workspaceName,
+}: {
+  userName: string;
+  workspaceName: string;
+}) {
   const done = roadmap.filter((p) => p.phase <= CURRENT_PHASE).length;
   const percent = Math.round((done / roadmap.length) * 100);
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="For you"
-        description="Your assigned work, activity and sprint progress will appear here."
+        title={`Welcome, ${userName.split(" ")[0] || userName}`}
+        description={`Your assigned work, activity and sprint progress in ${workspaceName} will appear here.`}
       />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

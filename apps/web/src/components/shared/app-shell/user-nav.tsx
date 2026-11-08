@@ -1,26 +1,27 @@
-import { UserIcon } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { Skeleton } from "@/components/ui/skeleton";
+import { SidebarMenu, SidebarMenuItem } from "@/components/ui/sidebar";
+import { getCurrentUser } from "@/server/auth";
+import { UserMenu } from "./user-menu";
 
-/** Signed-in user menu. Phase 1 wires this to the session (profile, preferences, sign out). */
-export function UserNav() {
+async function UserNavLoader() {
+  const user = await getCurrentUser();
+  if (!user) return null;
+  return <UserMenu user={user} />;
+}
+
+export function UserNavFallback() {
   return (
     <SidebarMenu>
-      <SidebarMenuItem>
-        <SidebarMenuButton size="lg">
-          <Avatar className="size-8">
-            <AvatarFallback>
-              <UserIcon className="size-4" aria-hidden="true" />
-            </AvatarFallback>
-          </Avatar>
-          <div className="grid flex-1 text-left text-sm leading-tight">
-            <span className="truncate font-medium">Guest</span>
-            <span className="truncate text-xs text-muted-foreground">
-              Sign-in arrives in Phase 1
-            </span>
-          </div>
-        </SidebarMenuButton>
+      <SidebarMenuItem className="flex items-center gap-2 p-2">
+        <Skeleton className="size-8 rounded-full" />
+        <div className="flex-1 space-y-1.5">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-3 w-32" />
+        </div>
       </SidebarMenuItem>
     </SidebarMenu>
   );
 }
+
+/** Signed-in user menu. Session data is request-time, so the caller wraps this in Suspense. */
+export { UserNavLoader as UserNav };
