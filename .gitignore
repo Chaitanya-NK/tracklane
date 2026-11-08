@@ -1,0 +1,34 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# builds
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# turbo
+.turbo/
+
+# testing
+coverage/
+playwright-report/
+test-results/
+
+# env
+.env
+.env*.local
+!.env.example
+
+# prisma generated client
+packages/db/src/generated/
+
+# misc
+.DS_Store
+*.pem
+npm-debug.log*
+pnpm-debug.log*
+.vercel

@@ -1,0 +1,38 @@
+{
+  "name": "Tracklane",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+  "hostRequirements": {
+    "cpus": 2,
+    "memory": "8gb"
+  },
+  "forwardPorts": [3000, 4001, 5432, 8025, 9001],
+  "portsAttributes": {
+    "3000": { "label": "Tracklane web", "onAutoForward": "openBrowser" },
+    "4001": { "label": "Realtime server", "onAutoForward": "silent" },
+    "5432": { "label": "Postgres", "onAutoForward": "silent" },
+    "8025": { "label": "Mailpit (dev inbox)", "onAutoForward": "silent" },
+    "9001": { "label": "MinIO console", "onAutoForward": "silent" }
+  },
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "postStartCommand": "docker compose up -d",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "bradlc.vscode-tailwindcss",
+        "Prisma.prisma",
+        "vitest.explorer",
+        "ms-playwright.playwright"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "typescript.tsdk": "node_modules/typescript/lib"
+      }
+    }
+  }
+}

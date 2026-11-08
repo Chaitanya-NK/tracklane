@@ -1,0 +1,8 @@
+pnpm-lock.yaml
+node_modules
+.next
+.turbo
+dist
+coverage
+packages/db/src/generated
+apps/web/src/components/ui
