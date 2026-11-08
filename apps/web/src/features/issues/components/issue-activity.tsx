@@ -52,6 +52,39 @@ function describe(item: ActivityItem) {
           removed the attachment <Value>{item.fromValue}</Value>
         </>
       );
+    case "approval_requested":
+      return (
+        <>
+          asked for approval to move from <Value>{item.fromValue}</Value> to{" "}
+          <Value>{item.toValue}</Value>
+        </>
+      );
+    case "approval_approved":
+      return (
+        <>
+          approved the move to <Value>{item.toValue}</Value>
+        </>
+      );
+    case "approval_rejected":
+      return (
+        <>
+          rejected the move to <Value>{item.toValue}</Value>
+        </>
+      );
+    case "approval_cancelled":
+      return (
+        <>
+          withdrew the request to move to <Value>{item.toValue}</Value>
+        </>
+      );
+    case "field_set":
+      return (
+        <>
+          set {item.field} to <Value>{item.toValue}</Value>
+        </>
+      );
+    case "field_cleared":
+      return <>cleared {item.field}</>;
     default: {
       const field = FIELD_LABELS[item.field ?? ""] ?? item.field;
       if (item.field === "description") return <>updated the description</>;

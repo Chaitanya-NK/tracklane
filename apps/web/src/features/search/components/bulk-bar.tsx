@@ -63,8 +63,13 @@ export function BulkBar({
     const res = await update.executeAsync({ slug, issueIds: selectedIds, patch });
     if (res?.serverError) return toast.error(res.serverError.message);
     if (!res?.data) return;
-    const { updated, skipped } = res.data;
+    const { updated, skipped, awaitingApproval } = res.data;
     if (updated) toast.success(`${what} for ${updated} issue${updated === 1 ? "" : "s"}`);
+    if (awaitingApproval) {
+      toast.info(`${awaitingApproval} sent for approval`, {
+        description: "Their status changes once an approver signs off.",
+      });
+    }
     if (skipped.length) {
       toast.warning(`Skipped ${skipped.length}`, {
         description: skipped

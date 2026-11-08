@@ -48,6 +48,7 @@ export async function bulkUpdate(input: {
   }
 
   let updated = 0;
+  let awaitingApproval = 0;
   const skipped: { key: string; reason: string }[] = [];
   for (const issue of issues) {
     const key = formatIssueKey(issue.project.key, issue.number);
@@ -78,13 +79,14 @@ export async function bulkUpdate(input: {
       patch.labelIds = [...new Set([...issue.labels.map((l) => l.labelId), label.id])];
     }
     try {
-      await updateIssue({ issueId: issue.id, userId: input.userId, patch });
+      const result = await updateIssue({ issueId: issue.id, userId: input.userId, patch });
       updated++;
+      if (result.approval) awaitingApproval++;
     } catch (error) {
       skipped.push({ key, reason: error instanceof AppError ? error.message : "Couldn't update" });
     }
   }
-  return { updated, skipped };
+  return { updated, skipped, awaitingApproval };
 }
 
 export async function bulkDelete(input: {

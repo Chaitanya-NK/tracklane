@@ -3,8 +3,8 @@
 import { useParams } from "next/navigation";
 import { LinkTabs } from "@/components/shared/link-tabs";
 
-/** Board · Backlog (Scrum only) · Timeline · Calendar · Issues · Settings. */
-export function ProjectTabs({ type }: { type: "scrum" | "kanban" }) {
+/** Board · Backlog · Timeline · Calendar · Issues · Settings. */
+export function ProjectTabs() {
   const { workspace, projectKey } = useParams<{ workspace: string; projectKey: string }>();
   const base = `/${workspace}/projects/${projectKey}`;
   return (
@@ -12,7 +12,7 @@ export function ProjectTabs({ type }: { type: "scrum" | "kanban" }) {
       label="Project"
       tabs={[
         { title: "Board", href: `${base}/board` },
-        ...(type === "scrum" ? [{ title: "Backlog", href: `${base}/backlog` }] : []),
+        { title: "Backlog", href: `${base}/backlog` },
         { title: "Timeline", href: `${base}/timeline` },
         { title: "Calendar", href: `${base}/calendar` },
         { title: "Issues", href: base },

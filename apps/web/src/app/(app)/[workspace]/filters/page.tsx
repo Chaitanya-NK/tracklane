@@ -49,7 +49,7 @@ async function Filters({ params, searchParams }: Props) {
   const [filters, saved, catalog, people] = await Promise.all([
     listFilters(workspace.id, user.id),
     filterId ? getFilter(workspace.id, user.id, filterId) : Promise.resolve(null),
-    getTqlCatalog(workspace.id),
+    getTqlCatalog(workspace.id, user.id),
     listAssignableUsers(workspace.id),
   ]);
   const summaries = filters.map(toSummary);

@@ -20,12 +20,15 @@ export function BacklogRow({
   dragging,
   overlay,
   handleProps,
+  actions,
 }: {
   card: PlanningCard;
   slug: string;
   dragging?: boolean;
   overlay?: boolean;
   handleProps?: React.HTMLAttributes<HTMLButtonElement> & { disabled?: boolean };
+  /** Extra controls at the end of the row. */
+  actions?: React.ReactNode;
 }) {
   return (
     <div
@@ -94,6 +97,7 @@ export function BacklogRow({
       ) : (
         <span className="size-6" aria-hidden="true" />
       )}
+      {actions}
     </div>
   );
 }
@@ -102,10 +106,12 @@ export function SortableBacklogRow({
   card,
   slug,
   disabled,
+  actions,
 }: {
   card: PlanningCard;
   slug: string;
   disabled?: boolean;
+  actions?: React.ReactNode;
 }) {
   const {
     attributes,
@@ -125,6 +131,7 @@ export function SortableBacklogRow({
         card={card}
         slug={slug}
         dragging={isDragging}
+        actions={actions}
         handleProps={
           {
             ...attributes,

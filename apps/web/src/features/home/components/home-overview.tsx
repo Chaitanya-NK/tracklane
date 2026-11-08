@@ -11,10 +11,13 @@ export function HomeOverview({
   header,
   stats,
   assigned,
+  approvals,
 }: {
   header: ReactNode;
   stats: ReactNode;
   assigned: ReactNode;
+  /** Pending approvals for the user; renders nothing when there are none. */
+  approvals?: ReactNode;
 }) {
   const done = roadmap.filter((p) => p.phase <= CURRENT_PHASE).length;
   const percent = Math.round((done / roadmap.length) * 100);
@@ -24,6 +27,8 @@ export function HomeOverview({
       {header}
 
       {stats}
+
+      {approvals}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">

@@ -11,6 +11,7 @@ import { toPlanningCard } from "@/features/board/server";
 import { listStatuses } from "@/features/projects/server";
 import { ActiveSprintHeader } from "@/features/sprints";
 import { getActiveSprint, getBoardIssues, listOpenSprints } from "@/features/sprints/server";
+import { getTransitionRules } from "@/features/workflow/server";
 import { getProjectAccess } from "@/server/authz";
 
 export const metadata: Metadata = { title: "Board" };
@@ -52,10 +53,11 @@ async function ProjectBoard({ params }: { params: Props["params"] }) {
     );
   }
 
-  const [statuses, issues, openSprints] = await Promise.all([
+  const [statuses, issues, openSprints, transitions] = await Promise.all([
     listStatuses(project.id),
     getBoardIssues(project, sprint?.id ?? null),
     sprint ? listOpenSprints(project.id) : Promise.resolve([]),
+    getTransitionRules(project.id),
   ]);
   const cards = issues.map(toPlanningCard);
   const done = cards.filter((c) => c.status.category === "done").length;
@@ -79,7 +81,10 @@ async function ProjectBoard({ params }: { params: Props["params"] }) {
       ) : null}
       <Board
         slug={slug}
-        columns={statuses.map(({ id, name, category }) => ({ id, name, category }))}
+        columns={statuses
+          .filter((s) => project.type !== "kanban" || s.id !== project.backlogStatusId)
+          .map(({ id, name, category }) => ({ id, name, category }))}
+        transitions={transitions}
         cards={cards}
         canEdit={can(role, "issues:update")}
         currentUserId={user.id}

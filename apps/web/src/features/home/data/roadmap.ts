@@ -35,8 +35,7 @@ export const roadmap: RoadmapPhase[] = [
   {
     phase: 5,
     title: "Workflow & fields",
-    summary: "Workflow editor, custom fields, approvals",
-    carryOver: ["Board swimlanes (assignee, epic)", "Kanban backlog column"],
+    summary: "Workflow editor, approvals, custom fields, TQL functions, swimlanes, Kanban backlog",
   },
   {
     phase: 6,
@@ -45,11 +44,16 @@ export const roadmap: RoadmapPhase[] = [
     carryOver: ["Email verification for new accounts"],
   },
   { phase: 7, title: "Reports & time", summary: "Burndown, velocity, dashboards, SLAs" },
-  { phase: 8, title: "Planning tools", summary: "Releases, goals, automation, dependencies" },
+  {
+    phase: 8,
+    title: "Planning tools",
+    summary: "Releases, goals, automation, dependencies",
+    carryOver: ["Custom issue types per project"],
+  },
   { phase: 9, title: "Collaboration", summary: "Docs, diagrams, whiteboard, retros, poker" },
   { phase: 10, title: "AI (Gemini)", summary: "Plain-English search, duplicates, release notes" },
   { phase: 11, title: "API & public pages", summary: "REST API, webhooks, portal, status page" },
   { phase: 12, title: "Hardening", summary: "Audit log, SSO, i18n, accessibility, PWA" },
 ];
 
-export const CURRENT_PHASE = 4;
+export const CURRENT_PHASE = 5;

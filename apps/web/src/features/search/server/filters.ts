@@ -2,6 +2,7 @@ import "server-only";
 import { AppError, can, parseTql, type WorkspaceRole } from "@tracklane/core";
 import { db } from "@tracklane/db";
 import { assertWorkspacePermission } from "@/server/authz";
+import { loadTqlEnvironment } from "./environment";
 
 const filterSelect = {
   id: true,
@@ -42,8 +43,9 @@ export async function getFilter(workspaceId: string, userId: string, filterId: s
   });
 }
 
-function assertValidQuery(query: string) {
-  const parsed = parseTql(query);
+async function assertValidQuery(workspaceId: string, userId: string, query: string) {
+  const env = await loadTqlEnvironment(workspaceId, userId);
+  const parsed = parseTql(query, env.parseOptions);
   if (!parsed.ok)
     throw new AppError("validation_failed", `The query has an error: ${parsed.error.message}`, {
       field: "query",
@@ -59,7 +61,7 @@ export async function createFilter(input: {
   shared: boolean;
 }) {
   await assertWorkspacePermission(input.workspaceId, input.userId, "projects:read");
-  assertValidQuery(input.query);
+  await assertValidQuery(input.workspaceId, input.userId, input.query);
   return db.savedFilter.create({
     data: {
       workspaceId: input.workspaceId,
@@ -99,8 +101,8 @@ export async function updateFilter(input: {
   query: string;
   shared: boolean;
 }) {
-  await assertCanManage(input.filterId, input.userId, input.role);
-  assertValidQuery(input.query);
+  const filter = await assertCanManage(input.filterId, input.userId, input.role);
+  await assertValidQuery(filter.workspaceId, input.userId, input.query);
   return db.savedFilter.update({
     where: { id: input.filterId },
     data: {

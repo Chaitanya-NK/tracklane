@@ -2,7 +2,9 @@ import "server-only";
 import { can, type WorkspaceRole } from "@tracklane/core";
 import { db } from "@tracklane/db";
 import { listAssignableUsers, listLabels, listStatuses } from "@/features/projects/server";
+import { listCustomFields } from "@/features/custom-fields/server";
 import { listOpenSprints } from "@/features/sprints/server";
+import { getTransitionRules } from "@/features/workflow/server/queries";
 import type { IssueFormOptions } from "../types";
 
 export async function loadIssueFormOptions(input: {
@@ -11,18 +13,21 @@ export async function loadIssueFormOptions(input: {
   role: WorkspaceRole;
   userId: string;
 }): Promise<IssueFormOptions> {
-  const [statuses, assignees, labels, parents, sprints] = await Promise.all([
-    listStatuses(input.project.id),
-    listAssignableUsers(input.workspaceId),
-    listLabels(input.project.id),
-    db.issue.findMany({
-      where: { projectId: input.project.id, type: { in: ["epic", "story", "task", "bug"] } },
-      orderBy: { number: "desc" },
-      take: 300,
-      select: { id: true, number: true, title: true, type: true },
-    }),
-    input.project.type === "scrum" ? listOpenSprints(input.project.id) : Promise.resolve([]),
-  ]);
+  const [statuses, assignees, labels, parents, sprints, transitions, customFields] =
+    await Promise.all([
+      listStatuses(input.project.id),
+      listAssignableUsers(input.workspaceId),
+      listLabels(input.project.id),
+      db.issue.findMany({
+        where: { projectId: input.project.id, type: { in: ["epic", "story", "task", "bug"] } },
+        orderBy: { number: "desc" },
+        take: 300,
+        select: { id: true, number: true, title: true, type: true },
+      }),
+      input.project.type === "scrum" ? listOpenSprints(input.project.id) : Promise.resolve([]),
+      getTransitionRules(input.project.id),
+      listCustomFields(input.project.id),
+    ]);
   return {
     project: {
       id: input.project.id,
@@ -35,6 +40,8 @@ export async function loadIssueFormOptions(input: {
     assignees,
     labels,
     parents,
+    transitions,
+    customFields,
     currentUserId: input.userId,
     canCreate: can(input.role, "issues:create"),
     canEdit: can(input.role, "issues:update"),

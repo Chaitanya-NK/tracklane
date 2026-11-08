@@ -75,6 +75,8 @@ export function AssigneePicker({
   disabled,
   id,
   variant,
+  label = "Assignee",
+  emptyLabel = "Unassigned",
 }: {
   value: string | null;
   onChange: (id: string | null) => void;
@@ -83,12 +85,14 @@ export function AssigneePicker({
   disabled?: boolean;
   id?: string;
   variant?: "field" | "ghost";
+  label?: string;
+  emptyLabel?: string;
 }) {
   const selected = users.find((u) => u.id === value);
   return (
     <PickerShell
       id={id}
-      label="Assignee"
+      label={label}
       disabled={disabled}
       variant={variant}
       trigger={
@@ -99,7 +103,7 @@ export function AssigneePicker({
           </>
         ) : (
           <span className="flex items-center gap-1.5 text-muted-foreground">
-            <UserIcon className="size-4" aria-hidden="true" /> Unassigned
+            <UserIcon className="size-4" aria-hidden="true" /> {emptyLabel}
           </span>
         )
       }
@@ -111,7 +115,7 @@ export function AssigneePicker({
             <CommandEmpty>No one found.</CommandEmpty>
             <CommandGroup>
               <CommandItem value="unassigned" onSelect={() => (onChange(null), close())}>
-                <UserIcon aria-hidden="true" /> Unassigned
+                <UserIcon aria-hidden="true" /> {emptyLabel}
                 {value === null ? <CheckIcon className="ml-auto" aria-hidden="true" /> : null}
               </CommandItem>
               {users.map((user) => (
@@ -146,6 +150,9 @@ export function LabelsPicker({
   id,
   variant,
   footer,
+  label = "Labels",
+  searchPlaceholder = "Search labels…",
+  emptyText = "No labels yet.",
 }: {
   value: string[];
   onChange: (ids: string[]) => void;
@@ -154,6 +161,9 @@ export function LabelsPicker({
   id?: string;
   variant?: "field" | "ghost";
   footer?: ReactNode;
+  label?: string;
+  searchPlaceholder?: string;
+  emptyText?: string;
 }) {
   const selected = labels.filter((l) => value.includes(l.id));
   const toggle = (labelId: string) =>
@@ -161,7 +171,7 @@ export function LabelsPicker({
   return (
     <PickerShell
       id={id}
-      label="Labels"
+      label={label}
       disabled={disabled}
       variant={variant}
       trigger={
@@ -174,9 +184,9 @@ export function LabelsPicker({
     >
       {() => (
         <>
-          <CommandInput placeholder="Search labels…" />
+          <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
-            <CommandEmpty>No labels yet.</CommandEmpty>
+            <CommandEmpty>{emptyText}</CommandEmpty>
             <CommandGroup>
               {labels.map((label) => (
                 <CommandItem key={label.id} value={label.name} onSelect={() => toggle(label.id)}>

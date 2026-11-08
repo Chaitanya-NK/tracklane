@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  allowedTargets,
+  decideTransition,
   ISSUE_TYPE_LABELS,
   ISSUE_TYPES,
   type IssueType,
@@ -10,6 +12,9 @@ import {
   type StatusCategory,
 } from "@tracklane/core";
 import { format } from "date-fns";
+import { ShieldCheckIcon } from "lucide-react";
+import { useAction } from "next-safe-action/hooks";
+import { toast } from "sonner";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { DatePicker, parseDateValue } from "@/components/shared/date-picker";
@@ -26,8 +31,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import type { CustomFieldValue } from "@/features/custom-fields";
+import { setIssueFieldValueAction } from "@/features/custom-fields/server/actions";
 import { toDateInputValue } from "@/lib/format";
 import type { IssueFormOptions } from "../types";
+import { CustomFieldInput } from "./custom-field-input";
 import { AssigneePicker, LabelsPicker, ParentPicker } from "./field-pickers";
 import { IssueTypeIcon, PriorityIcon } from "./issue-meta";
 import { useIssueUpdate } from "./use-issue-update";
@@ -50,6 +58,8 @@ export interface IssueDetailsValue {
   updatedAt: Date;
   resolvedAt: Date | null;
   hasChildren: boolean;
+  /** Custom field values by field id. */
+  fieldValues: Record<string, CustomFieldValue>;
 }
 
 function Row({
@@ -84,6 +94,32 @@ export function IssueDetailsPanel({
   const [estimate, setEstimate] = useState(issue.estimate?.toString() ?? "");
   const nameOf = (userId: string | null) => options.assignees.find((u) => u.id === userId)?.name;
   const parentLabel = issue.type === "subtask" ? "Parent" : "Epic";
+  const setField = useAction(setIssueFieldValueAction);
+
+  async function saveField(fieldId: string, name: string, value: CustomFieldValue | null) {
+    const res = await setField.executeAsync({ issueId: issue.id, fieldId, value });
+    if (res?.serverError) return void toast.error(res.serverError.message);
+    if (res?.validationErrors) return void toast.error(`${name} isn't valid`);
+    if (res?.data?.changed)
+      toast.success(value === null || value === false ? `${name} cleared` : `${name} updated`);
+  }
+
+  // Statuses the workflow lets this issue move to; the rest stay visible but disabled.
+  const reachable = new Set(
+    allowedTargets({
+      ...options.transitions,
+      fromStatusId: issue.statusId,
+      statusIds: options.statuses.map((s) => s.id),
+    }),
+  );
+  const needsApproval = (toStatusId: string) => {
+    const decision = decideTransition({
+      ...options.transitions,
+      fromStatusId: issue.statusId,
+      toStatusId,
+    });
+    return decision.allowed && decision.requiresApproval;
+  };
 
   const typeSelect = (
     <Select
@@ -122,8 +158,13 @@ export function IssueDetailsPanel({
           </SelectTrigger>
           <SelectContent>
             {options.statuses.map((s) => (
-              <SelectItem key={s.id} value={s.id}>
+              <SelectItem key={s.id} value={s.id} disabled={!reachable.has(s.id)}>
                 {s.name}
+                {needsApproval(s.id) ? (
+                  <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
+                    <ShieldCheckIcon className="size-3.5" aria-hidden="true" /> approval
+                  </span>
+                ) : null}
               </SelectItem>
             ))}
           </SelectContent>
@@ -308,6 +349,19 @@ export function IssueDetailsPanel({
           onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
         />
       </Row>
+      {options.customFields.map((field) => (
+        <Row key={field.id} label={field.name} htmlFor={`cf-${field.id}`}>
+          <CustomFieldInput
+            id={`cf-${field.id}`}
+            variant="ghost"
+            field={field}
+            value={issue.fieldValues[field.id] ?? null}
+            users={options.assignees}
+            disabled={disabled}
+            onChange={(value) => void saveField(field.id, field.name, value)}
+          />
+        </Row>
+      ))}
       <Row label="Reporter">
         {issue.reporter ? (
           <span className="flex items-center gap-2 px-2 text-sm">

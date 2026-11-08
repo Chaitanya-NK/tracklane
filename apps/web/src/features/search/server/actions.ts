@@ -1,6 +1,6 @@
 "use server";
 
-import { prioritySchema } from "@tracklane/core";
+import { prioritySchema, TQL_VALUE_KINDS } from "@tracklane/core";
 import { refresh } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
@@ -9,6 +9,7 @@ import { authActionClient } from "@/server/safe-action";
 import { storage } from "@/server/storage";
 import { bulkDelete, bulkUpdate, MAX_BULK } from "./bulk";
 import { createFilter, deleteFilter, toggleFavorite, updateFilter } from "./filters";
+import { createTqlFunction, deleteTqlFunction, updateTqlFunction } from "./functions";
 import { getTqlCatalog } from "./search";
 
 const filterFields = {
@@ -63,9 +64,9 @@ export const toggleFavoriteAction = authActionClient
 
 export const getTqlCatalogAction = authActionClient
   .inputSchema(z.object({ slug: z.string() }))
-  .action(async ({ parsedInput }) => {
+  .action(async ({ parsedInput, ctx }) => {
     const { workspace } = await getWorkspaceAccess(parsedInput.slug);
-    return getTqlCatalog(workspace.id);
+    return getTqlCatalog(workspace.id, ctx.user.id);
   });
 
 const ids = z.array(z.string()).min(1).max(MAX_BULK);
@@ -108,4 +109,51 @@ export const bulkDeleteAction = authActionClient
     after(() => Promise.all(storageKeys.map((key) => storage().delete(key))));
     refresh();
     return { deleted };
+  });
+
+const tqlFunctionSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("condition"),
+    name: z.string().trim().max(40),
+    description: z.string().trim().max(300),
+    body: z.string().max(5000),
+  }),
+  z.object({
+    kind: z.literal("values"),
+    name: z.string().trim().max(40),
+    description: z.string().trim().max(300),
+    valueKind: z.enum(TQL_VALUE_KINDS),
+    values: z.array(z.string().max(200)).max(200),
+  }),
+]);
+
+export const createTqlFunctionAction = authActionClient
+  .inputSchema(z.object({ slug: z.string(), fn: tqlFunctionSchema }))
+  .action(async ({ parsedInput, ctx }) => {
+    const { workspace } = await getWorkspaceAccess(parsedInput.slug);
+    const fn = await createTqlFunction(workspace.id, ctx.user.id, parsedInput.fn);
+    refresh();
+    return fn;
+  });
+
+export const updateTqlFunctionAction = authActionClient
+  .inputSchema(z.object({ slug: z.string(), functionId: z.string(), fn: tqlFunctionSchema }))
+  .action(async ({ parsedInput, ctx }) => {
+    const { workspace } = await getWorkspaceAccess(parsedInput.slug);
+    const fn = await updateTqlFunction(
+      workspace.id,
+      ctx.user.id,
+      parsedInput.functionId,
+      parsedInput.fn,
+    );
+    refresh();
+    return fn;
+  });
+
+export const deleteTqlFunctionAction = authActionClient
+  .inputSchema(z.object({ slug: z.string(), functionId: z.string() }))
+  .action(async ({ parsedInput, ctx }) => {
+    const { workspace } = await getWorkspaceAccess(parsedInput.slug);
+    await deleteTqlFunction(workspace.id, ctx.user.id, parsedInput.functionId);
+    refresh();
   });

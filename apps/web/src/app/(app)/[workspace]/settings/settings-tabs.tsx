@@ -12,6 +12,7 @@ export function SettingsTabs() {
       tabs={[
         { title: "General", href: workspacePath(workspace, "settings") },
         { title: "Members", href: workspacePath(workspace, "settings/members") },
+        { title: "TQL functions", href: workspacePath(workspace, "settings/functions") },
       ]}
     />
   );

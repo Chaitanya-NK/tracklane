@@ -11,6 +11,8 @@ import {
   type Priority,
 } from "@tracklane/core";
 import { db, type Prisma } from "@tracklane/db";
+import { type FieldValueInput, writeFieldValues } from "@/features/custom-fields/server/values";
+import { gateStatusChange, type StatusChange } from "@/features/workflow/server/transition";
 import { assertWorkspacePermission } from "@/server/authz";
 import { diffIssue, type IssueSnapshot } from "../activity";
 
@@ -162,6 +164,8 @@ export interface CreateIssueInput {
   estimate?: number | null;
   labelIds?: string[];
   sprintId?: string | null;
+  /** Custom field values by field id. Required fields must be present. */
+  fieldValues?: Record<string, FieldValueInput>;
 }
 
 export async function createIssue(input: CreateIssueInput) {
@@ -236,6 +240,14 @@ export async function createIssue(input: CreateIssueInput) {
       },
       select: { id: true, number: true },
     });
+    await writeFieldValues(tx, {
+      issueId: issue.id,
+      projectId: project.id,
+      workspaceId: input.workspaceId,
+      userId: input.userId,
+      values: input.fieldValues ?? {},
+      creating: true,
+    });
     await tx.project.update({ where: { id: project.id }, data: { updatedAt: new Date() } });
     return { id: issue.id, key: formatIssueKey(project.key, issue.number) };
   });
@@ -256,11 +268,17 @@ export interface IssuePatch {
   sprintId?: string | null;
 }
 
-export async function updateIssue(input: { issueId: string; userId: string; patch: IssuePatch }) {
+export async function updateIssue(input: {
+  issueId: string;
+  userId: string;
+  patch: IssuePatch;
+  /** Set only when applying an approved transition: the workflow gate was already passed. */
+  approved?: boolean;
+}) {
   return db.$transaction(async (tx) => {
     const before = await loadIssue(tx, input.issueId);
     await assertWorkspacePermission(before.workspaceId, input.userId, "issues:update");
-    const { patch } = input;
+    const patch = { ...input.patch };
     const type = patch.type ?? before.type;
 
     if (patch.type && patch.type !== before.type && before._count.children > 0) {
@@ -282,6 +300,17 @@ export async function updateIssue(input: { issueId: string; userId: string; patc
         sprintId: patch.sprintId,
       },
     );
+
+    let statusChange: StatusChange = { kind: "apply" };
+    if (patch.statusId && !input.approved) {
+      statusChange = await gateStatusChange(tx, {
+        issue: before,
+        toStatusId: patch.statusId,
+        userId: input.userId,
+      });
+      // Waiting for approval: everything else in the patch still applies.
+      if (statusChange.kind === "approval") delete patch.statusId;
+    }
 
     const resolvedAt = await resolvedAtFor(tx, before, patch.statusId);
     const nextStart =
@@ -331,7 +360,11 @@ export async function updateIssue(input: { issueId: string; userId: string; patc
       await moveSubtasksWithParent(tx, before.id, patch.sprintId, input.userId);
     }
     const changed = await recordChanges(tx, before, input.userId);
-    return { key: formatIssueKey(before.project.key, before.number), changed };
+    return {
+      key: formatIssueKey(before.project.key, before.number),
+      changed,
+      approval: statusChange.kind === "approval" ? { toStatus: statusChange.toStatus } : null,
+    };
   });
 }
 
@@ -418,6 +451,10 @@ export interface MoveIssueInput {
   /** Neighbours in the destination list after the drop (either may be missing). */
   beforeId?: string | null;
   afterId?: string | null;
+  /** Board swimlanes: dropping into another lane changes that lane's field too. */
+  assigneeId?: string | null;
+  priority?: Priority;
+  parentId?: string | null;
 }
 
 /**
@@ -434,8 +471,24 @@ export async function moveIssue(input: MoveIssueInput) {
     await validateReferences(
       tx,
       { workspaceId: before.workspaceId, projectId: before.projectId, issueId: before.id },
-      { type: before.type, statusId: input.statusId, sprintId: input.sprintId },
+      {
+        type: before.type,
+        statusId: input.statusId,
+        sprintId: input.sprintId,
+        assigneeId: input.assigneeId,
+        parentId: input.parentId !== undefined ? input.parentId : before.parentId,
+      },
     );
+    let statusId = input.statusId;
+    let statusChange: StatusChange = { kind: "apply" };
+    if (statusId) {
+      statusChange = await gateStatusChange(tx, {
+        issue: before,
+        toStatusId: statusId,
+        userId: input.userId,
+      });
+      if (statusChange.kind === "approval") statusId = undefined;
+    }
 
     const neighbourIds = [input.beforeId, input.afterId].filter((id): id is string => Boolean(id));
     const loadNeighbours = () =>
@@ -458,17 +511,23 @@ export async function moveIssue(input: MoveIssueInput) {
     await tx.issue.update({
       where: { id: before.id },
       data: {
-        statusId: input.statusId,
+        statusId,
         sprintId: input.sprintId,
+        assigneeId: input.assigneeId,
+        priority: input.priority,
+        parentId: input.parentId,
         position: position ?? undefined,
-        resolvedAt: await resolvedAtFor(tx, before, input.statusId),
+        resolvedAt: await resolvedAtFor(tx, before, statusId),
       },
     });
     if (input.sprintId !== undefined && input.sprintId !== before.sprintId) {
       await moveSubtasksWithParent(tx, before.id, input.sprintId, input.userId);
     }
     await recordChanges(tx, before, input.userId);
-    return { key: formatIssueKey(before.project.key, before.number) };
+    return {
+      key: formatIssueKey(before.project.key, before.number),
+      approval: statusChange.kind === "approval" ? { toStatus: statusChange.toStatus } : null,
+    };
   });
 }
 

@@ -51,6 +51,8 @@ export interface ProjectAccess extends WorkspaceAccess {
     type: "scrum" | "kanban";
     leadId: string | null;
     archivedAt: Date | null;
+    /** Kanban: issues in this status are in the Backlog tab, not on the board. */
+    backlogStatusId: string | null;
   };
 }
 
@@ -70,6 +72,7 @@ export const getProjectAccess = cache(
         type: true,
         leadId: true,
         archivedAt: true,
+        backlogStatusId: true,
       },
     });
     if (!project) notFound();

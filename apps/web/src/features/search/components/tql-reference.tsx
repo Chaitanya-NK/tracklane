@@ -17,6 +17,11 @@ const EXAMPLES = [
   ['text ~ "checkout" AND created >= -14d', "Mentions checkout, created in the last two weeks"],
   ["sprint in (openSprints()) AND assignee is empty", "Unassigned work in open sprints"],
   ["labels in (frontend, backend) AND NOT status = Done", "Labelled and not done"],
+  [
+    '"Team" = Growth AND "Customer facing" = true',
+    "Custom fields, by name (quote names with spaces)",
+  ],
+  ['filter("Open bugs") AND assignee = currentUser()', "Reuse a saved filter"],
 ] as const;
 
 /** Syntax reference shown under the results. Generated from the field registry. */
@@ -68,6 +73,12 @@ export function TqlReference() {
               </li>
             ))}
           </ul>
+          <h3 className="pt-2 text-sm font-medium">Workspace functions</h3>
+          <p className="text-xs text-muted-foreground">
+            Admins can name a condition (<code>isStale()</code>) or a list of values (
+            <code>assignee IN myTeam()</code>) under Settings → TQL functions. They show up in
+            autocomplete as you type.
+          </p>
         </div>
       </CardContent>
     </Card>

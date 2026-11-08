@@ -21,7 +21,7 @@ async function ProjectHeading({ params }: { params: Props["params"] }) {
           </p>
         </div>
       </div>
-      <ProjectTabs type={project.type} />
+      <ProjectTabs />
     </div>
   );
 }

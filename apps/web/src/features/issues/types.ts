@@ -1,4 +1,5 @@
-import type { IssueType, StatusCategory } from "@tracklane/core";
+import type { IssueType, StatusCategory, TransitionRule } from "@tracklane/core";
+import type { CustomFieldDef } from "@/features/custom-fields";
 
 /** Choices for the issue form and detail fields of one project. */
 export interface IssueFormOptions {
@@ -10,6 +11,9 @@ export interface IssueFormOptions {
   sprints: { id: string; name: string; state: "planned" | "active" | "completed" }[];
   /** Possible parents: epics and (for subtasks) stories, tasks and bugs. */
   parents: { id: string; number: number; title: string; type: IssueType }[];
+  /** The project's workflow rules, to grey out moves it won't allow. */
+  transitions: { restrict: boolean; rules: TransitionRule[] };
+  customFields: CustomFieldDef[];
   currentUserId: string;
   canCreate: boolean;
   canEdit: boolean;

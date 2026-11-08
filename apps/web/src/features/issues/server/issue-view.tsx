@@ -1,5 +1,5 @@
 import "server-only";
-import { can, formatIssueKey } from "@tracklane/core";
+import { can, canApprove, formatIssueKey, ROLE_RANK } from "@tracklane/core";
 import type { Route } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -27,7 +27,10 @@ import {
   IssueTitle,
   IssueTypeIcon,
 } from "@/features/issues";
+import { getIssueFieldValues } from "@/features/custom-fields/server";
 import { ProjectAvatar } from "@/features/projects";
+import { ApprovalBanner } from "@/features/workflow";
+import { getPendingApproval } from "@/features/workflow/server";
 import { getIssueByKey, listActivity, listAttachments, listComments } from "./queries";
 import { loadIssueFormOptions } from "./form-options";
 import { getWorkspaceAccess } from "@/server/authz";
@@ -64,7 +67,7 @@ export async function IssueView({
   if (!issue) notFound();
 
   const key = formatIssueKey(issue.project.key, issue.number);
-  const [options, comments, attachments, activity] = await Promise.all([
+  const [options, comments, attachments, activity, fieldValues, approval] = await Promise.all([
     loadIssueFormOptions({
       workspaceId: workspace.id,
       project: issue.project,
@@ -74,6 +77,8 @@ export async function IssueView({
     listComments(issue.id),
     listAttachments(issue.id),
     listActivity(issue.id),
+    getIssueFieldValues(issue.id),
+    getPendingApproval(issue.id),
   ]);
   const canEdit = can(role, "issues:update");
   const childLabel = issue.type === "epic" ? "Issues in this epic" : "Subtasks";
@@ -145,6 +150,14 @@ export async function IssueView({
             </div>
             <IssueTitle issueId={issue.id} title={issue.title} canEdit={canEdit} />
           </div>
+
+          {approval ? (
+            <ApprovalBanner
+              request={approval}
+              canDecide={canApprove(role, approval.approverRole)}
+              canWithdraw={approval.requestedById === user.id || ROLE_RANK[role] >= ROLE_RANK.admin}
+            />
+          ) : null}
 
           <IssueDescription issueId={issue.id} description={issue.description} canEdit={canEdit} />
 
@@ -233,6 +246,7 @@ export async function IssueView({
                   updatedAt: issue.updatedAt,
                   resolvedAt: issue.resolvedAt,
                   hasChildren: issue.children.length > 0,
+                  fieldValues,
                 }}
               />
             </CardContent>

@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { PageHeader } from "@/components/shared/page-header";
 import { HeadingSkeleton, TableSkeleton } from "@/components/shared/skeletons";
 import { HomeOverview, MyAssignedIssues, MyStats, MyStatsFallback } from "@/features/home";
+import { MyApprovals } from "@/features/workflow/server";
 import { getWorkspaceAccess } from "@/server/authz";
 
 export const metadata: Metadata = { title: "For you" };
@@ -29,6 +30,11 @@ export default function HomePage({ params }: PageProps<"/[workspace]">) {
       stats={
         <Suspense fallback={<MyStatsFallback />}>
           <MyStats params={params} />
+        </Suspense>
+      }
+      approvals={
+        <Suspense fallback={null}>
+          <MyApprovals params={params} />
         </Suspense>
       }
       assigned={

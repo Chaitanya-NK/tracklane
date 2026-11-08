@@ -2,6 +2,7 @@ export {
   getActiveSprint,
   getBacklog,
   getBoardIssues,
+  getKanbanBacklog,
   listOpenSprints,
   planningIssueSelect,
   type PlanningIssue,

@@ -3,6 +3,7 @@ import { parseTql, type TqlCatalog } from "@tracklane/core";
 import { db, type Prisma } from "@tracklane/db";
 import { issueListSelect } from "@/features/issues/server";
 import { compileTql } from "../compile";
+import { loadTqlEnvironment } from "./environment";
 
 export const searchSelect = {
   ...issueListSelect,
@@ -28,7 +29,8 @@ export async function searchIssues(input: {
   page?: number;
   pageSize?: number;
 }): Promise<SearchResult> {
-  const parsed = parseTql(input.query);
+  const env = await loadTqlEnvironment(input.workspaceId, input.userId);
+  const parsed = parseTql(input.query, env.parseOptions);
   if (!parsed.ok) {
     return {
       ok: false,
@@ -43,6 +45,7 @@ export async function searchIssues(input: {
     workspaceId: input.workspaceId,
     userId: input.userId,
     now: new Date(),
+    ...env.compile,
   });
   if (!compiled.ok) return { ok: false, error: { message: compiled.message } };
 
@@ -61,8 +64,8 @@ export async function searchIssues(input: {
 }
 
 /** Real values in the workspace, for TQL autocomplete. */
-export async function getTqlCatalog(workspaceId: string): Promise<TqlCatalog> {
-  const [projects, statuses, members, labels, sprints] = await Promise.all([
+export async function getTqlCatalog(workspaceId: string, userId: string): Promise<TqlCatalog> {
+  const [projects, statuses, members, labels, sprints, env] = await Promise.all([
     db.project.findMany({
       where: { workspaceId, archivedAt: null },
       orderBy: { key: "asc" },
@@ -91,8 +94,12 @@ export async function getTqlCatalog(workspaceId: string): Promise<TqlCatalog> {
       take: 50,
       select: { name: true },
     }),
+    loadTqlEnvironment(workspaceId, userId),
   ]);
   return {
+    customFields: [...(env.parseOptions.customFields ?? [])],
+    functions: [...(env.parseOptions.functions ?? [])],
+    savedFilters: env.savedFilterNames,
     projects,
     statuses: statuses.map((s) => s.name),
     users: members.map((m) => m.user),

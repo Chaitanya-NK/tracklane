@@ -7,7 +7,7 @@ export const planningIssueSelect = {
   ...issueListSelect,
   position: true,
   sprintId: true,
-  parent: { select: { number: true, title: true } },
+  parent: { select: { id: true, number: true, title: true, type: true } },
 } satisfies Prisma.IssueSelect;
 
 export type PlanningIssue = Prisma.IssueGetPayload<{ select: typeof planningIssueSelect }>;
@@ -68,7 +68,7 @@ const KANBAN_DONE_WINDOW_DAYS = 14;
  * recently finished work. Epics live in the backlog/timeline, not on the board.
  */
 export async function getBoardIssues(
-  project: { id: string; type: "scrum" | "kanban" },
+  project: { id: string; type: "scrum" | "kanban"; backlogStatusId?: string | null },
   sprintId: string | null,
 ) {
   if (project.type === "scrum" && !sprintId) return [];
@@ -79,8 +79,21 @@ export async function getBoardIssues(
       type: { not: "epic" },
       ...(project.type === "scrum"
         ? { sprintId }
-        : { OR: [{ status: { category: { not: "done" } } }, { resolvedAt: { gte: doneSince } }] }),
+        : {
+            OR: [{ status: { category: { not: "done" } } }, { resolvedAt: { gte: doneSince } }],
+            // The Kanban backlog lives in its own tab.
+            ...(project.backlogStatusId ? { statusId: { not: project.backlogStatusId } } : {}),
+          }),
     },
+    orderBy: [{ position: "asc" }, { number: "asc" }],
+    select: planningIssueSelect,
+  });
+}
+
+/** Kanban backlog: issues waiting in the backlog status, by rank (epics excluded). */
+export function getKanbanBacklog(projectId: string, backlogStatusId: string) {
+  return db.issue.findMany({
+    where: { projectId, statusId: backlogStatusId, type: { not: "epic" } },
     orderBy: [{ position: "asc" }, { number: "asc" }],
     select: planningIssueSelect,
   });

@@ -13,7 +13,7 @@ export interface PlanningCard {
   sprintId: string | null;
   assignee: { id: string; name: string; image: string | null } | null;
   labels: { id: string; name: string; color: string }[];
-  parent: { key: string; title: string } | null;
+  parent: { id: string; key: string; title: string; type: IssueType } | null;
   dueDate: string | null;
 }
 

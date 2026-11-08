@@ -14,6 +14,7 @@ import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { z } from "zod";
+import { fieldValueSchema } from "@/features/custom-fields/server/values";
 import { listProjects } from "@/features/projects/server";
 import { getProjectAccess, getWorkspaceAccess } from "@/server/authz";
 import { authActionClient } from "@/server/safe-action";
@@ -60,6 +61,7 @@ export const createIssueAction = authActionClient
       estimate: issueFields.estimate.optional(),
       labelIds: issueFields.labelIds.optional(),
       sprintId: issueFields.sprintId.optional(),
+      fieldValues: z.record(z.string(), fieldValueSchema).optional(),
     }),
   )
   .action(async ({ parsedInput: { slug, projectKey, ...fields }, ctx }) => {
@@ -151,6 +153,9 @@ export const moveIssueAction = authActionClient
       sprintId: z.string().nullable().optional(),
       beforeId: z.string().nullable().optional(),
       afterId: z.string().nullable().optional(),
+      assigneeId: z.string().nullable().optional(),
+      priority: prioritySchema.optional(),
+      parentId: z.string().nullable().optional(),
     }),
   )
   .action(async ({ parsedInput, ctx }) => {

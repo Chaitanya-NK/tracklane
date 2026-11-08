@@ -38,7 +38,7 @@ describe("compileTql", () => {
     expect(where("assignee is empty")).toEqual({ assigneeId: null });
     expect(where("labels is not empty")).toEqual({ NOT: { labels: { none: {} } } });
     expect(where("sprint in (openSprints())")).toEqual({
-      OR: [{ sprint: { state: { in: ["active", "planned"] } } }],
+      sprint: { state: { in: ["active", "planned"] } },
     });
     expect(where("parent = WEB-1")).toEqual({ parent: { number: 1, project: { key: "WEB" } } });
   });

@@ -1,11 +1,15 @@
 import { can } from "@tracklane/core";
+import { InboxIcon } from "lucide-react";
 import type { Metadata, Route } from "next";
-import { redirect } from "next/navigation";
+import Link from "next/link";
 import { Suspense } from "react";
+import { EmptyState } from "@/components/shared/empty-state";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toPlanningCard } from "@/features/board/server";
-import { Backlog } from "@/features/sprints";
-import { getBacklog } from "@/features/sprints/server";
+import { listStatuses } from "@/features/projects/server";
+import { Backlog, KanbanBacklog } from "@/features/sprints";
+import { getBacklog, getKanbanBacklog } from "@/features/sprints/server";
 import { getProjectAccess } from "@/server/authz";
 
 export const metadata: Metadata = { title: "Backlog" };
@@ -28,8 +32,47 @@ function BacklogSkeleton() {
 async function ProjectBacklog({ params }: { params: Props["params"] }) {
   const { workspace: slug, projectKey } = await params;
   const { user, project, role } = await getProjectAccess(slug, projectKey);
-  // Kanban projects have no sprints; their backlog is the To Do column.
-  if (project.type !== "scrum") redirect(`/${slug}/projects/${project.key}/board` as Route);
+  if (project.type === "kanban") {
+    const backlogStatusId = project.backlogStatusId;
+    if (!backlogStatusId) {
+      return (
+        <EmptyState
+          icon={InboxIcon}
+          title="This board has no backlog"
+          description="Pick a To do status as the backlog: its issues move here and off the board until someone pulls them in."
+          action={
+            can(role, "projects:update") ? (
+              <Button asChild>
+                <Link href={`/${slug}/projects/${project.key}/settings/workflow` as Route}>
+                  Set up the backlog
+                </Link>
+              </Button>
+            ) : undefined
+          }
+        />
+      );
+    }
+    const [statuses, issues] = await Promise.all([
+      listStatuses(project.id),
+      getKanbanBacklog(project.id, backlogStatusId),
+    ]);
+    const backlogStatus = statuses.find((s) => s.id === backlogStatusId);
+    // "To board" moves to the first column after the backlog (a To do one if there is one).
+    const boardStatuses = statuses.filter((s) => s.id !== backlogStatusId);
+    const boardStatus =
+      boardStatuses.find((s) => s.category === "todo") ?? boardStatuses[0] ?? null;
+    return (
+      <KanbanBacklog
+        slug={slug}
+        projectKey={project.key}
+        cards={issues.map(toPlanningCard)}
+        backlogStatusName={backlogStatus?.name ?? "Backlog"}
+        boardStatus={boardStatus ? { id: boardStatus.id, name: boardStatus.name } : null}
+        canEdit={can(role, "issues:update")}
+        currentUserId={user.id}
+      />
+    );
+  }
   const { sprints, backlog } = await getBacklog(project.id);
 
   return (

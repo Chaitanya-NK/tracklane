@@ -5,3 +5,4 @@ export { ProjectAvatar } from "./components/project-avatar";
 export { ProjectSettingsForm } from "./components/project-settings-form";
 export { ProjectsTable } from "./components/projects-table";
 export { ProjectTabs } from "./components/project-tabs";
+export { ProjectSettingsTabs } from "./components/project-settings-tabs";

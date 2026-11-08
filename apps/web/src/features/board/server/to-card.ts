@@ -17,7 +17,12 @@ export function toPlanningCard(issue: PlanningIssue): PlanningCard {
     assignee: issue.assignee,
     labels: issue.labels.map((l) => l.label),
     parent: issue.parent
-      ? { key: formatIssueKey(issue.project.key, issue.parent.number), title: issue.parent.title }
+      ? {
+          id: issue.parent.id,
+          key: formatIssueKey(issue.project.key, issue.parent.number),
+          title: issue.parent.title,
+          type: issue.parent.type,
+        }
       : null,
     dueDate: issue.dueDate ? issue.dueDate.toISOString().slice(0, 10) : null,
   };

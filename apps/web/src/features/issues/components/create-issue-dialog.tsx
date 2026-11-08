@@ -42,7 +42,9 @@ import {
   getIssueFormOptionsAction,
   listProjectOptionsAction,
 } from "../server/actions";
+import type { CustomFieldValue } from "@/features/custom-fields";
 import type { IssueFormOptions, ProjectOption } from "../types";
+import { CustomFieldInput } from "./custom-field-input";
 import { AssigneePicker, LabelsPicker, ParentPicker } from "./field-pickers";
 import { IssueTypeIcon, PriorityIcon } from "./issue-meta";
 import { Spinner } from "@/components/ui/spinner";
@@ -68,6 +70,7 @@ interface Draft {
   startDate: string;
   dueDate: string;
   estimate: string;
+  fieldValues: Record<string, CustomFieldValue | null>;
 }
 
 const emptyDraft = (defaults: CreateIssueDefaults): Draft => ({
@@ -83,6 +86,7 @@ const emptyDraft = (defaults: CreateIssueDefaults): Draft => ({
   startDate: "",
   dueDate: "",
   estimate: "",
+  fieldValues: {},
 });
 
 export function CreateIssueDialog({
@@ -129,6 +133,8 @@ function CreateIssueForm({
   );
   const [draft, setDraft] = useState<Draft>(() => emptyDraft(defaults));
   const [createAnother, setCreateAnother] = useState(false);
+  // Remounts uncontrolled custom field inputs after "Create another".
+  const [createdCount, setCreatedCount] = useState(0);
   const [titleError, setTitleError] = useState<string | null>(null);
 
   const loadProjects = useAction(listProjectOptionsAction);
@@ -182,12 +188,17 @@ function CreateIssueForm({
       startDate: draft.startDate || null,
       dueDate: draft.dueDate || null,
       estimate: draft.estimate === "" ? null : Number(draft.estimate),
+      // Only this project's fields (the draft may hold values from a project picked earlier).
+      fieldValues: Object.fromEntries(
+        options.customFields.map((f) => [f.id, draft.fieldValues[f.id] ?? null]),
+      ),
     });
     if (!res?.data) return;
     const href = `/${slug}/issues/${res.data.key}` as Route;
     toast.success(`Created ${res.data.key}`, {
       action: { label: "View", onClick: () => router.push(href) },
     });
+    setCreatedCount((n) => n + 1);
     if (createAnother) {
       setDraft((d) => ({ ...emptyDraft(defaults), type: d.type, parentId: d.parentId }));
     } else {
@@ -420,6 +431,31 @@ function CreateIssueForm({
                     onChange={(e) => update("estimate", e.target.value)}
                   />
                 </Field>
+                {options.customFields.map((field) => {
+                  const invalid =
+                    create.result.serverError?.field === `cf:${field.id}` || undefined;
+                  return (
+                    <Field key={field.id} data-invalid={invalid}>
+                      <FieldLabel htmlFor={`ci-cf-${field.id}`}>
+                        {field.name}
+                        {field.required && field.type !== "checkbox" ? (
+                          <span className="text-destructive">*</span>
+                        ) : null}
+                      </FieldLabel>
+                      <CustomFieldInput
+                        key={`${field.id}:${createdCount}`}
+                        id={`ci-cf-${field.id}`}
+                        field={field}
+                        value={draft.fieldValues[field.id] ?? null}
+                        users={options.assignees}
+                        invalid={invalid}
+                        onChange={(value) =>
+                          update("fieldValues", { ...draft.fieldValues, [field.id]: value })
+                        }
+                      />
+                    </Field>
+                  );
+                })}
               </div>
 
               <DialogFooter className="items-center sm:justify-between">

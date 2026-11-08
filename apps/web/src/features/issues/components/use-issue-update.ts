@@ -22,6 +22,11 @@ export function useIssueUpdate(issueId: string) {
       toast.error("Some values aren't valid");
       return false;
     }
+    if (res.data.approval) {
+      toast.info("Sent for approval", {
+        description: `Moving to ${res.data.approval.toStatus} needs approval. The status changes once it's approved.`,
+      });
+    }
     if (message && res.data.changed > 0) toast.success(message);
     return true;
   }
