@@ -5,6 +5,7 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
 import { env } from "@/env";
+import { authTrustedOrigins } from "./origins";
 
 const github =
   env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET
@@ -29,7 +30,9 @@ export const auth = betterAuth({
   appName: "Tracklane",
   baseURL: env.NEXT_PUBLIC_APP_URL,
   secret: env.BETTER_AUTH_SECRET,
-  trustedOrigins: [env.NEXT_PUBLIC_APP_URL],
+  trustedOrigins: authTrustedOrigins(env.NEXT_PUBLIC_APP_URL, env.NODE_ENV),
+  // Secure (__Secure-) cookies only in production, so dev works over http://localhost too.
+  advanced: { useSecureCookies: env.NODE_ENV === "production" },
   database: prismaAdapter(db, { provider: "postgresql" }),
   emailAndPassword: {
     enabled: true,
