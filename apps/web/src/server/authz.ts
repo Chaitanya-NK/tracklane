@@ -41,3 +41,38 @@ export async function assertWorkspacePermission(
   }
   return membership.role;
 }
+
+export interface ProjectAccess extends WorkspaceAccess {
+  project: {
+    id: string;
+    key: string;
+    name: string;
+    description: string;
+    type: "scrum" | "kanban";
+    leadId: string | null;
+    archivedAt: Date | null;
+  };
+}
+
+/** Workspace access plus a project in it, looked up by key ("PAY"). 404 if either is missing. */
+export const getProjectAccess = cache(
+  async (workspaceSlug: string, projectKey: string): Promise<ProjectAccess> => {
+    const access = await getWorkspaceAccess(workspaceSlug);
+    const project = await db.project.findUnique({
+      where: {
+        workspaceId_key: { workspaceId: access.workspace.id, key: projectKey.toUpperCase() },
+      },
+      select: {
+        id: true,
+        key: true,
+        name: true,
+        description: true,
+        type: true,
+        leadId: true,
+        archivedAt: true,
+      },
+    });
+    if (!project) notFound();
+    return { ...access, project };
+  },
+);

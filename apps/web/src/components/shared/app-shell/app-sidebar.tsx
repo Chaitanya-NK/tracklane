@@ -1,4 +1,3 @@
-import { PlusIcon } from "lucide-react";
 import { Suspense } from "react";
 import {
   Sidebar,
@@ -7,12 +6,12 @@ import {
   SidebarGroup,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSkeleton,
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { CommandMenu } from "./command-menu";
+import { CreateIssueMenuButton } from "./create-issue-menu-button";
 import { NavMain } from "./nav-main";
 import { UserNav, UserNavFallback } from "./user-nav";
 import { WorkspaceSwitcher, WorkspaceSwitcherFallback } from "./workspace-switcher";
@@ -31,10 +30,7 @@ export function AppSidebar({ params }: { params: Promise<{ workspace: string }> 
             </Suspense>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Create issue (Phase 2)" disabled>
-              <PlusIcon aria-hidden="true" />
-              <span>Create issue</span>
-            </SidebarMenuButton>
+            <CreateIssueMenuButton />
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>

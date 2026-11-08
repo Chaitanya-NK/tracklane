@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/shared/page-header";
-import { HeadingSkeleton } from "@/components/shared/skeletons";
-import { HomeOverview } from "@/features/home";
+import { HeadingSkeleton, TableSkeleton } from "@/components/shared/skeletons";
+import { HomeOverview, MyAssignedIssues, MyStats, MyStatsFallback } from "@/features/home";
 import { getWorkspaceAccess } from "@/server/authz";
 
 export const metadata: Metadata = { title: "For you" };
@@ -24,6 +24,16 @@ export default function HomePage({ params }: PageProps<"/[workspace]">) {
       header={
         <Suspense fallback={<HeadingSkeleton />}>
           <Greeting params={params} />
+        </Suspense>
+      }
+      stats={
+        <Suspense fallback={<MyStatsFallback />}>
+          <MyStats params={params} />
+        </Suspense>
+      }
+      assigned={
+        <Suspense fallback={<TableSkeleton rows={3} />}>
+          <MyAssignedIssues params={params} />
         </Suspense>
       }
     />

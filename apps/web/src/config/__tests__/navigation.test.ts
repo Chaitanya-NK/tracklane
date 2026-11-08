@@ -11,6 +11,7 @@ describe("navigation", () => {
     expect(findNavItem("/acme")?.title).toBe("For you");
     expect(findNavItem("/acme/projects/web")?.title).toBe("Projects");
     expect(findNavItem("/acme/settings/members")?.title).toBe("Settings");
+    expect(findNavItem("/acme/issues/PAY-1")?.title).toBe("Projects");
     expect(findNavItem("/acme/nope")).toBeUndefined();
   });
 });

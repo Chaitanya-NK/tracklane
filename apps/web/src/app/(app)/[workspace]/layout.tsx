@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { AppHeader, AppSidebar } from "@/components/shared/app-shell";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { CreateIssueProvider } from "@/features/issues";
 import { WorkspaceGate } from "./workspace-gate";
 
 function PageFallback() {
@@ -23,15 +24,17 @@ function PageFallback() {
 export default function WorkspaceLayout({ children, params }: LayoutProps<"/[workspace]">) {
   return (
     <SidebarProvider>
-      <AppSidebar params={params} />
-      <SidebarInset>
-        <AppHeader />
-        <main className="mx-auto w-full max-w-7xl flex-1 p-4 md:p-6">
-          <Suspense fallback={<PageFallback />}>
-            <WorkspaceGate params={params}>{children}</WorkspaceGate>
-          </Suspense>
-        </main>
-      </SidebarInset>
+      <CreateIssueProvider>
+        <AppSidebar params={params} />
+        <SidebarInset>
+          <AppHeader />
+          <main className="mx-auto w-full max-w-7xl flex-1 p-4 md:p-6">
+            <Suspense fallback={<PageFallback />}>
+              <WorkspaceGate params={params}>{children}</WorkspaceGate>
+            </Suspense>
+          </main>
+        </SidebarInset>
+      </CreateIssueProvider>
     </SidebarProvider>
   );
 }

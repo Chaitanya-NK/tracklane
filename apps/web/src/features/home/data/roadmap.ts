@@ -29,4 +29,4 @@ export const roadmap: RoadmapPhase[] = [
   { phase: 12, title: "Hardening", summary: "Audit log, SSO, i18n, accessibility, PWA" },
 ];
 
-export const CURRENT_PHASE = 1;
+export const CURRENT_PHASE = 2;

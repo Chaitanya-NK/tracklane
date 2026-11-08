@@ -1,6 +1,6 @@
 "use client";
 
-import { MoonIcon, SearchIcon, SunIcon } from "lucide-react";
+import { MoonIcon, PlusIcon, SearchIcon, SunIcon } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useCallback, useEffect, useState } from "react";
@@ -16,12 +16,14 @@ import {
 import { Kbd } from "@/components/ui/kbd";
 import { SidebarMenuButton } from "@/components/ui/sidebar";
 import { primaryNav, secondaryNav, workspacePath } from "@/config/navigation";
+import { useCreateIssue } from "@/features/issues";
 
 /** ⌘K / Ctrl+K command palette. Issues, actions and AI search plug into this in later phases. */
 export function CommandMenu() {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const { workspace } = useParams<{ workspace: string }>();
+  const { openCreateIssue } = useCreateIssue();
   const { setTheme } = useTheme();
 
   useEffect(() => {
@@ -60,6 +62,14 @@ export function CommandMenu() {
         <CommandInput placeholder="Search or run a command…" />
         <CommandList>
           <CommandEmpty>No results found.</CommandEmpty>
+          <CommandGroup heading="Actions">
+            <CommandItem onSelect={() => run(() => openCreateIssue())}>
+              <PlusIcon aria-hidden="true" />
+              Create issue
+              <Kbd className="ml-auto">C</Kbd>
+            </CommandItem>
+          </CommandGroup>
+          <CommandSeparator />
           <CommandGroup heading="Navigate">
             {[...primaryNav, ...secondaryNav].map((item) => (
               <CommandItem

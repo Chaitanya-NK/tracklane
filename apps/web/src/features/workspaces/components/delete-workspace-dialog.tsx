@@ -24,12 +24,17 @@ export function DeleteWorkspaceDialog({
   workspace: { name: string; slug: string };
 }) {
   const [confirmName, setConfirmName] = useState("");
-  const { execute, isPending, result, reset } = useAction(deleteWorkspaceAction);
+  const [open, setOpen] = useState(false);
+  const { execute, isPending, result, reset } = useAction(deleteWorkspaceAction, {
+    onNavigation: () => setOpen(false),
+  });
 
   return (
     <AlertDialog
-      onOpenChange={(open) => {
-        if (!open) {
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) {
           setConfirmName("");
           reset();
         }

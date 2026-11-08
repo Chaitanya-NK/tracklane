@@ -1,28 +1,21 @@
-import {
-  CircleCheckIcon,
-  CircleDashedIcon,
-  ClockIcon,
-  EyeIcon,
-  InboxIcon,
-  UserIcon,
-} from "lucide-react";
+import { CircleCheckIcon, CircleDashedIcon } from "lucide-react";
 import { type ReactNode, Suspense } from "react";
-import { EmptyState } from "@/components/shared/empty-state";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CURRENT_PHASE, roadmap } from "../data/roadmap";
 import { SystemStatus } from "./system-status";
 
-const stats = [
-  { label: "Assigned to me", icon: UserIcon },
-  { label: "Due this week", icon: ClockIcon },
-  { label: "Waiting on review", icon: EyeIcon },
-  { label: "Done this sprint", icon: CircleCheckIcon },
-] as const;
-
 /** The workspace home. `header` streams in separately because it reads the session. */
-export function HomeOverview({ header }: { header: ReactNode }) {
+export function HomeOverview({
+  header,
+  stats,
+  assigned,
+}: {
+  header: ReactNode;
+  stats: ReactNode;
+  assigned: ReactNode;
+}) {
   const done = roadmap.filter((p) => p.phase <= CURRENT_PHASE).length;
   const percent = Math.round((done / roadmap.length) * 100);
 
@@ -30,33 +23,15 @@ export function HomeOverview({ header }: { header: ReactNode }) {
     <div className="space-y-6">
       {header}
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {stats.map((stat) => (
-          <Card key={stat.label} className="gap-3 py-5">
-            <CardHeader className="flex flex-row items-center justify-between px-5">
-              <CardDescription className="font-medium">{stat.label}</CardDescription>
-              <stat.icon className="size-4 text-muted-foreground" aria-hidden="true" />
-            </CardHeader>
-            <CardContent className="px-5">
-              <p className="text-3xl font-semibold tracking-tight">0</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {stats}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Assigned to me</CardTitle>
-            <CardDescription>Issues you own across all projects.</CardDescription>
+            <CardDescription>Open issues you own, soonest due first.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <EmptyState
-              icon={InboxIcon}
-              title="Nothing assigned yet"
-              description="Once projects and issues exist (Phase 2), your work shows up here."
-            />
-          </CardContent>
+          <CardContent>{assigned}</CardContent>
         </Card>
 
         <div className="space-y-6">

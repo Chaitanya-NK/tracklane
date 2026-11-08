@@ -32,3 +32,6 @@ packages/db/src/generated/
 npm-debug.log*
 pnpm-debug.log*
 .vercel
+
+# Local uploads (attachments)
+.data/
