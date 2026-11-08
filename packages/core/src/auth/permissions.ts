@@ -14,13 +14,31 @@ export const PERMISSIONS = [
   "members:remove",
   "projects:create",
   "projects:read",
+  "projects:update",
+  "projects:delete",
+  "issues:create",
+  "issues:update",
+  "issues:delete",
+  "comments:create",
+  /** Edit or delete other people's comments (everyone can manage their own). */
+  "comments:moderate",
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
 const VIEWER: Permission[] = ["workspace:read", "members:read", "projects:read"];
-const MEMBER: Permission[] = [...VIEWER, "projects:create"];
+const MEMBER: Permission[] = [
+  ...VIEWER,
+  "projects:create",
+  "issues:create",
+  "issues:update",
+  "comments:create",
+];
 const ADMIN: Permission[] = [
   ...MEMBER,
+  "projects:update",
+  "projects:delete",
+  "issues:delete",
+  "comments:moderate",
   "workspace:update",
   "members:invite",
   "members:update_role",
