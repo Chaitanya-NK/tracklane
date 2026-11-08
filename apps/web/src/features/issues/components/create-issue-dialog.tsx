@@ -9,12 +9,12 @@ import {
   PRIORITY_LABELS,
   type Priority,
 } from "@tracklane/core";
-import { Loader2Icon } from "lucide-react";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { useAction } from "next-safe-action/hooks";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { DatePicker } from "@/components/shared/date-picker";
 import { MarkdownEditor } from "@/components/shared/markdown-editor";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import {
   Select,
   SelectContent,
@@ -45,6 +45,7 @@ import {
 import type { IssueFormOptions, ProjectOption } from "../types";
 import { AssigneePicker, LabelsPicker, ParentPicker } from "./field-pickers";
 import { IssueTypeIcon, PriorityIcon } from "./issue-meta";
+import { Spinner } from "@/components/ui/spinner";
 
 export interface CreateIssueDefaults {
   projectKey?: string;
@@ -205,8 +206,8 @@ function CreateIssueForm({
           ) : null}
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="ci-project">Project *</Label>
+            <Field>
+              <FieldLabel htmlFor="ci-project">Project *</FieldLabel>
               <Select value={projectKey} onValueChange={setChosenKey} disabled={!projects}>
                 <SelectTrigger id="ci-project" className="w-full">
                   <SelectValue placeholder="Loading…" />
@@ -219,9 +220,9 @@ function CreateIssueForm({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="ci-type">Issue type *</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="ci-type">Issue type *</FieldLabel>
               <Select value={draft.type} onValueChange={(v) => update("type", v as IssueType)}>
                 <SelectTrigger id="ci-type" className="w-full">
                   <SelectValue />
@@ -229,12 +230,12 @@ function CreateIssueForm({
                 <SelectContent>
                   {ISSUE_TYPES.map((t) => (
                     <SelectItem key={t} value={t}>
-                      <IssueTypeIcon type={t} /> {ISSUE_TYPE_LABELS[t]}
+                      <IssueTypeIcon type={t} tooltip={false} /> {ISSUE_TYPE_LABELS[t]}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
           </div>
 
           {!options ? (
@@ -250,8 +251,8 @@ function CreateIssueForm({
             </Alert>
           ) : (
             <>
-              <div className="space-y-2">
-                <Label htmlFor="ci-title">Summary *</Label>
+              <Field data-invalid={Boolean(titleError) || undefined}>
+                <FieldLabel htmlFor="ci-title">Summary *</FieldLabel>
                 <Input
                   id="ci-title"
                   value={draft.title}
@@ -260,11 +261,11 @@ function CreateIssueForm({
                   maxLength={255}
                   aria-invalid={Boolean(titleError)}
                 />
-                {titleError ? <p className="text-sm text-destructive">{titleError}</p> : null}
-              </div>
+                {titleError ? <FieldError>{titleError}</FieldError> : null}
+              </Field>
 
-              <div className="space-y-2">
-                <Label htmlFor="ci-description">Description</Label>
+              <Field>
+                <FieldLabel htmlFor="ci-description">Description</FieldLabel>
                 <MarkdownEditor
                   id="ci-description"
                   value={draft.description}
@@ -273,11 +274,11 @@ function CreateIssueForm({
                   rows={5}
                   onSubmit={() => submit()}
                 />
-              </div>
+              </Field>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="ci-status">Status</Label>
+                <Field>
+                  <FieldLabel htmlFor="ci-status">Status</FieldLabel>
                   <Select
                     value={draft.statusId ?? options.statuses[0]?.id}
                     onValueChange={(v) => update("statusId", v)}
@@ -293,9 +294,9 @@ function CreateIssueForm({
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="ci-priority">Priority</Label>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="ci-priority">Priority</FieldLabel>
                   <Select
                     value={draft.priority}
                     onValueChange={(v) => update("priority", v as Priority)}
@@ -306,23 +307,25 @@ function CreateIssueForm({
                     <SelectContent>
                       {[...PRIORITIES].reverse().map((p) => (
                         <SelectItem key={p} value={p}>
-                          <PriorityIcon priority={p} /> {PRIORITY_LABELS[p]}
+                          <PriorityIcon priority={p} tooltip={false} /> {PRIORITY_LABELS[p]}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-                <div className="space-y-2">
+                </Field>
+                <Field>
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="ci-assignee">Assignee</Label>
+                    <FieldLabel htmlFor="ci-assignee">Assignee</FieldLabel>
                     {currentUserId && draft.assigneeId !== currentUserId ? (
-                      <button
+                      <Button
                         type="button"
-                        className="text-xs font-medium text-primary hover:underline"
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0 text-xs"
                         onClick={() => update("assigneeId", currentUserId)}
                       >
                         Assign to me
-                      </button>
+                      </Button>
                     ) : null}
                   </div>
                   <AssigneePicker
@@ -332,21 +335,21 @@ function CreateIssueForm({
                     users={options.assignees}
                     currentUserId={currentUserId}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="ci-labels">Labels</Label>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="ci-labels">Labels</FieldLabel>
                   <LabelsPicker
                     id="ci-labels"
                     value={draft.labelIds}
                     onChange={(v) => update("labelIds", v)}
                     labels={options.labels}
                   />
-                </div>
+                </Field>
                 {parentTypes.length ? (
-                  <div className="space-y-2 sm:col-span-2">
-                    <Label htmlFor="ci-parent">
+                  <Field className="sm:col-span-2">
+                    <FieldLabel htmlFor="ci-parent">
                       {draft.type === "subtask" ? "Parent issue *" : "Epic"}
-                    </Label>
+                    </FieldLabel>
                     <ParentPicker
                       id="ci-parent"
                       value={draft.parentId}
@@ -355,19 +358,19 @@ function CreateIssueForm({
                       projectKey={options.project.key}
                       childType={draft.type}
                     />
-                  </div>
+                  </Field>
                 ) : null}
-                <div className="space-y-2">
-                  <Label htmlFor="ci-due">Due date</Label>
-                  <Input
+                <Field>
+                  <FieldLabel htmlFor="ci-due">Due date</FieldLabel>
+                  <DatePicker
                     id="ci-due"
-                    type="date"
-                    value={draft.dueDate}
-                    onChange={(e) => update("dueDate", e.target.value)}
+                    placeholder="No due date"
+                    value={draft.dueDate || null}
+                    onChange={(value) => update("dueDate", value ?? "")}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="ci-estimate">Story points</Label>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="ci-estimate">Story points</FieldLabel>
                   <Input
                     id="ci-estimate"
                     type="number"
@@ -377,25 +380,26 @@ function CreateIssueForm({
                     value={draft.estimate}
                     onChange={(e) => update("estimate", e.target.value)}
                   />
-                </div>
+                </Field>
               </div>
 
               <DialogFooter className="items-center sm:justify-between">
-                <label className="flex items-center gap-2 text-sm">
+                <Field orientation="horizontal" className="w-auto">
                   <Checkbox
+                    id="ci-another"
                     checked={createAnother}
                     onCheckedChange={(v) => setCreateAnother(v === true)}
                   />
-                  Create another
-                </label>
+                  <FieldLabel htmlFor="ci-another" className="font-normal">
+                    Create another
+                  </FieldLabel>
+                </Field>
                 <div className="flex gap-2">
                   <Button type="button" variant="ghost" onClick={onDone}>
                     Cancel
                   </Button>
                   <Button type="submit" disabled={create.isPending}>
-                    {create.isPending ? (
-                      <Loader2Icon className="animate-spin" aria-hidden="true" />
-                    ) : null}
+                    {create.isPending ? <Spinner /> : null}
                     Create
                   </Button>
                 </div>

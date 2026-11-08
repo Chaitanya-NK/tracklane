@@ -1,6 +1,6 @@
 "use client";
 
-import { CopyIcon, LinkIcon, Loader2Icon, MoreHorizontalIcon, Trash2Icon } from "lucide-react";
+import { CopyIcon, LinkIcon, MoreHorizontalIcon, Trash2Icon } from "lucide-react";
 import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { deleteIssueAction } from "../server/actions";
+import { Spinner } from "@/components/ui/spinner";
 
 export function IssueActionsMenu({
   slug,
@@ -86,9 +87,7 @@ export function IssueActionsMenu({
               disabled={remove.isPending}
               onClick={() => remove.execute({ slug, issueId })}
             >
-              {remove.isPending ? (
-                <Loader2Icon className="animate-spin" aria-hidden="true" />
-              ) : null}
+              {remove.isPending ? <Spinner /> : null}
               Delete
             </Button>
           </AlertDialogFooter>

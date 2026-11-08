@@ -1,6 +1,5 @@
 "use client";
 
-import { Loader2Icon } from "lucide-react";
 import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import {
@@ -15,8 +14,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { deleteWorkspaceAction } from "../server/actions";
+import { Spinner } from "@/components/ui/spinner";
 
 export function DeleteWorkspaceDialog({
   workspace,
@@ -51,20 +51,18 @@ export function DeleteWorkspaceDialog({
             it. It can&apos;t be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <div className="space-y-2">
-          <Label htmlFor="confirm-workspace-name">
+        <Field>
+          <FieldLabel htmlFor="confirm-workspace-name">
             Type <span className="font-semibold">{workspace.name}</span> to confirm
-          </Label>
+          </FieldLabel>
           <Input
             id="confirm-workspace-name"
             value={confirmName}
             onChange={(e) => setConfirmName(e.target.value)}
             autoComplete="off"
           />
-          {result.serverError ? (
-            <p className="text-sm text-destructive">{result.serverError.message}</p>
-          ) : null}
-        </div>
+          {result.serverError ? <FieldError>{result.serverError.message}</FieldError> : null}
+        </Field>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
           <Button
@@ -72,7 +70,7 @@ export function DeleteWorkspaceDialog({
             disabled={confirmName !== workspace.name || isPending}
             onClick={() => execute({ slug: workspace.slug, confirmName })}
           >
-            {isPending ? <Loader2Icon className="animate-spin" aria-hidden="true" /> : null}
+            {isPending ? <Spinner /> : null}
             Delete workspace
           </Button>
         </AlertDialogFooter>

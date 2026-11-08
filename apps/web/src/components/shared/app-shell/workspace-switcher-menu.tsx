@@ -18,7 +18,9 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { workspacePath } from "@/config/navigation";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { initials } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 interface WorkspaceOption {
   id: string;
@@ -27,11 +29,13 @@ interface WorkspaceOption {
   role: WorkspaceRole;
 }
 
-function WorkspaceAvatar({ name }: { name: string }) {
+function WorkspaceAvatar({ name, className }: { name: string; className?: string }) {
   return (
-    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-xs font-semibold text-primary-foreground">
-      {initials(name)}
-    </span>
+    <Avatar className={cn("size-8 rounded-lg", className)} aria-hidden="true">
+      <AvatarFallback className="rounded-lg bg-primary text-xs font-semibold text-primary-foreground">
+        {initials(name)}
+      </AvatarFallback>
+    </Avatar>
   );
 }
 
@@ -73,9 +77,10 @@ export function WorkspaceSwitcherMenu({
             {workspaces.map((workspace) => (
               <DropdownMenuItem key={workspace.id} asChild className="gap-2 p-2">
                 <Link href={workspacePath(workspace.slug)}>
-                  <span className="flex size-6 items-center justify-center rounded-md bg-muted text-[10px] font-semibold">
-                    {initials(workspace.name)}
-                  </span>
+                  <WorkspaceAvatar
+                    name={workspace.name}
+                    className="size-6 rounded-md text-[10px] *:rounded-md"
+                  />
                   <span className="flex-1 truncate">{workspace.name}</span>
                   {workspace.slug === currentSlug ? (
                     <CheckIcon className="size-4" aria-label="Current workspace" />

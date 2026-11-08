@@ -7,7 +7,6 @@ import {
   WORKSPACE_ROLES,
   type WorkspaceRole,
 } from "@tracklane/core";
-import { Loader2Icon } from "lucide-react";
 import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -41,6 +40,7 @@ import {
 } from "@/components/ui/table";
 import { initials } from "@/lib/format";
 import { removeMemberAction, updateMemberRoleAction } from "../server/actions";
+import { Spinner } from "@/components/ui/spinner";
 
 export interface MemberRow {
   id: string;
@@ -92,7 +92,7 @@ function RoleCell({
           ))}
         </SelectContent>
       </Select>
-      {isPending ? <Loader2Icon className="size-4 animate-spin" aria-label="Saving" /> : null}
+      {isPending ? <Spinner aria-label="Saving" /> : null}
     </div>
   );
 }
@@ -142,7 +142,7 @@ function RemoveButton({
             disabled={isPending}
             onClick={() => execute({ slug, memberId: member.id, leaving: isSelf })}
           >
-            {isPending ? <Loader2Icon className="animate-spin" aria-hidden="true" /> : null}
+            {isPending ? <Spinner /> : null}
             {isSelf ? "Leave workspace" : "Remove"}
           </Button>
         </AlertDialogFooter>

@@ -2,7 +2,6 @@
 
 import { slugify, workspaceNameSchema, workspaceSlugSchema } from "@tracklane/core";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2Icon } from "lucide-react";
 import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -19,7 +18,14 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+  InputGroupText,
+} from "@/components/ui/input-group";
 import { createWorkspaceAction } from "../server/actions";
+import { Spinner } from "@/components/ui/spinner";
 
 const schema = z.object({ name: workspaceNameSchema, slug: workspaceSlugSchema });
 
@@ -80,13 +86,13 @@ export function CreateWorkspaceForm({ host }: { host: string }) {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Workspace URL</FormLabel>
-              <div className="flex items-center rounded-md border border-input shadow-xs focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50">
-                <span className="border-r px-3 text-sm whitespace-nowrap text-muted-foreground">
-                  {host}/
-                </span>
+              <InputGroup>
+                <InputGroupAddon>
+                  <InputGroupText>{host}/</InputGroupText>
+                </InputGroupAddon>
                 <FormControl>
-                  <Input
-                    className="border-0 shadow-none focus-visible:ring-0"
+                  <InputGroupInput
+                    className="pl-0.5"
                     placeholder="acme-labs"
                     {...field}
                     onChange={(event) => {
@@ -95,16 +101,14 @@ export function CreateWorkspaceForm({ host }: { host: string }) {
                     }}
                   />
                 </FormControl>
-              </div>
+              </InputGroup>
               <FormDescription>Lowercase letters, numbers and hyphens.</FormDescription>
               <FormMessage />
             </FormItem>
           )}
         />
         <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-          {form.formState.isSubmitting ? (
-            <Loader2Icon className="animate-spin" aria-hidden="true" />
-          ) : null}
+          {form.formState.isSubmitting ? <Spinner /> : null}
           Create workspace
         </Button>
       </form>

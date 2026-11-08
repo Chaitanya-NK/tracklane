@@ -1,11 +1,12 @@
 "use client";
 
-import { Loader2Icon, PencilIcon } from "lucide-react";
+import { PencilIcon } from "lucide-react";
 import { useState } from "react";
 import { Markdown } from "@/components/shared/markdown";
 import { MarkdownEditor } from "@/components/shared/markdown-editor";
 import { Button } from "@/components/ui/button";
 import { useIssueUpdate } from "./use-issue-update";
+import { Spinner } from "@/components/ui/spinner";
 
 export function IssueDescription({
   issueId,
@@ -22,7 +23,7 @@ export function IssueDescription({
 
   async function commit() {
     if (value === description) return setEditing(false);
-    if (await save({ description: value })) setEditing(false);
+    if (await save({ description: value }, "Description updated")) setEditing(false);
   }
 
   return (
@@ -53,7 +54,7 @@ export function IssueDescription({
           />
           <div className="flex gap-2">
             <Button size="sm" onClick={commit} disabled={isPending}>
-              {isPending ? <Loader2Icon className="animate-spin" aria-hidden="true" /> : null}
+              {isPending ? <Spinner /> : null}
               Save
             </Button>
             <Button
@@ -69,13 +70,13 @@ export function IssueDescription({
       ) : description ? (
         <Markdown>{description}</Markdown>
       ) : canEdit ? (
-        <button
-          type="button"
+        <Button
+          variant="outline"
           onClick={() => (setValue(""), setEditing(true))}
-          className="w-full rounded-md border border-dashed px-3 py-6 text-left text-sm text-muted-foreground hover:bg-muted"
+          className="h-auto w-full justify-start border-dashed px-3 py-6 font-normal text-muted-foreground"
         >
           Add a description…
-        </button>
+        </Button>
       ) : (
         <p className="text-sm text-muted-foreground">No description.</p>
       )}

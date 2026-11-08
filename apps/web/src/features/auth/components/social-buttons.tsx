@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { FieldSeparator } from "@/components/ui/field";
 import { authClient } from "@/lib/auth-client";
 
 type Provider = "github" | "google";
@@ -70,11 +71,9 @@ export function SocialButtons({
           );
         })}
       </div>
-      <div className="flex items-center gap-3">
-        <span className="h-px flex-1 bg-border" />
-        <span className="text-xs text-muted-foreground uppercase">or continue with email</span>
-        <span className="h-px flex-1 bg-border" />
-      </div>
+      <FieldSeparator className="*:data-[slot=field-separator-content]:bg-background">
+        Or continue with email
+      </FieldSeparator>
     </div>
   );
 }

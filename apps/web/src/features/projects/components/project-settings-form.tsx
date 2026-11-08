@@ -1,13 +1,12 @@
 "use client";
 
-import { Loader2Icon } from "lucide-react";
 import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import { toast } from "sonner";
 import { MarkdownEditor } from "@/components/shared/markdown-editor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import {
   Select,
   SelectContent,
@@ -16,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { updateProjectAction } from "../server/actions";
+import { Spinner } from "@/components/ui/spinner";
 
 export function ProjectSettingsForm({
   slug,
@@ -55,8 +55,8 @@ export function ProjectSettingsForm({
       }}
     >
       <fieldset disabled={!canEdit} className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="p-name">Name</Label>
+        <Field>
+          <FieldLabel htmlFor="p-name">Name</FieldLabel>
           <Input
             id="p-name"
             value={name}
@@ -64,15 +64,15 @@ export function ProjectSettingsForm({
             maxLength={80}
           />
           {result.validationErrors?.name ? (
-            <p className="text-sm text-destructive">{result.validationErrors.name._errors?.[0]}</p>
+            <FieldError>{result.validationErrors.name._errors?.[0]}</FieldError>
           ) : null}
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="p-key">Key</Label>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="p-key">Key</FieldLabel>
           <Input id="p-key" value={project.key} disabled className="w-40 font-mono" />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="p-lead">Project lead</Label>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="p-lead">Project lead</FieldLabel>
           <Select value={leadId} onValueChange={setLeadId}>
             <SelectTrigger id="p-lead" className="w-full sm:w-72">
               <SelectValue />
@@ -86,20 +86,20 @@ export function ProjectSettingsForm({
               ))}
             </SelectContent>
           </Select>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="p-description">Description</Label>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="p-description">Description</FieldLabel>
           <MarkdownEditor
             id="p-description"
             value={description}
             onChange={setDescription}
             rows={5}
           />
-        </div>
+        </Field>
       </fieldset>
       {canEdit ? (
         <Button type="submit" disabled={!dirty || isPending}>
-          {isPending ? <Loader2Icon className="animate-spin" aria-hidden="true" /> : null}
+          {isPending ? <Spinner /> : null}
           Save changes
         </Button>
       ) : (

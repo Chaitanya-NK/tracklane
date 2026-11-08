@@ -1,6 +1,5 @@
 "use client";
 
-import { Loader2Icon } from "lucide-react";
 import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import {
@@ -15,8 +14,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { deleteProjectAction } from "../server/actions";
+import { Spinner } from "@/components/ui/spinner";
 
 export function DeleteProjectDialog({
   slug,
@@ -51,20 +51,18 @@ export function DeleteProjectDialog({
             Every issue, comment and attachment in this project is deleted permanently.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <div className="space-y-2">
-          <Label htmlFor="confirm-project-key">
+        <Field>
+          <FieldLabel htmlFor="confirm-project-key">
             Type <span className="font-mono font-semibold">{project.key}</span> to confirm
-          </Label>
+          </FieldLabel>
           <Input
             id="confirm-project-key"
             value={confirmKey}
             onChange={(e) => setConfirmKey(e.target.value)}
             autoComplete="off"
           />
-          {result.serverError ? (
-            <p className="text-sm text-destructive">{result.serverError.message}</p>
-          ) : null}
-        </div>
+          {result.serverError ? <FieldError>{result.serverError.message}</FieldError> : null}
+        </Field>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
           <Button
@@ -72,7 +70,7 @@ export function DeleteProjectDialog({
             disabled={confirmKey.trim().toUpperCase() !== project.key || isPending}
             onClick={() => execute({ slug, projectKey: project.key, confirmKey })}
           >
-            {isPending ? <Loader2Icon className="animate-spin" aria-hidden="true" /> : null}
+            {isPending ? <Spinner /> : null}
             Delete project
           </Button>
         </AlertDialogFooter>

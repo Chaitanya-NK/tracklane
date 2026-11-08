@@ -9,7 +9,7 @@ import {
   suggestProjectKey,
 } from "@tracklane/core";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2Icon, PlusIcon } from "lucide-react";
+import { PlusIcon } from "lucide-react";
 import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
@@ -34,9 +34,17 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldLabel,
+  FieldTitle,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { createProjectAction } from "../server/actions";
+import { Spinner } from "@/components/ui/spinner";
 
 const schema = z.object({
   name: projectNameSchema,
@@ -158,20 +166,17 @@ export function CreateProjectDialog({ slug }: { slug: string }) {
                       className="grid gap-2 sm:grid-cols-2"
                     >
                       {PROJECT_TYPES.map((type) => (
-                        <label
-                          key={type}
-                          className="flex cursor-pointer gap-3 rounded-lg border p-3 has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/5"
-                        >
-                          <RadioGroupItem value={type} className="mt-0.5" />
-                          <span>
-                            <span className="block text-sm font-medium">
-                              {PROJECT_TYPE_LABELS[type].label}
-                            </span>
-                            <span className="block text-xs text-muted-foreground">
-                              {PROJECT_TYPE_LABELS[type].description}
-                            </span>
-                          </span>
-                        </label>
+                        <FieldLabel key={type} htmlFor={`project-type-${type}`}>
+                          <Field orientation="horizontal">
+                            <FieldContent>
+                              <FieldTitle>{PROJECT_TYPE_LABELS[type].label}</FieldTitle>
+                              <FieldDescription>
+                                {PROJECT_TYPE_LABELS[type].description}
+                              </FieldDescription>
+                            </FieldContent>
+                            <RadioGroupItem value={type} id={`project-type-${type}`} />
+                          </Field>
+                        </FieldLabel>
                       ))}
                     </RadioGroup>
                   </FormControl>
@@ -180,9 +185,7 @@ export function CreateProjectDialog({ slug }: { slug: string }) {
             />
             <DialogFooter>
               <Button type="submit" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? (
-                  <Loader2Icon className="animate-spin" aria-hidden="true" />
-                ) : null}
+                {form.formState.isSubmitting ? <Spinner /> : null}
                 Create project
               </Button>
             </DialogFooter>

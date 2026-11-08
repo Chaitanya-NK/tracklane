@@ -1,7 +1,6 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2Icon } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -23,6 +22,7 @@ import { authClient } from "@/lib/auth-client";
 import { safeCallbackUrl } from "@/lib/safe-redirect";
 import { signUpSchema } from "../schemas";
 import { SocialButtons } from "./social-buttons";
+import { Spinner } from "@/components/ui/spinner";
 
 export function SignUpForm({ providers }: { providers: ("github" | "google")[] }) {
   const router = useRouter();
@@ -102,9 +102,7 @@ export function SignUpForm({ providers }: { providers: ("github" | "google")[] }
             )}
           />
           <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-            {form.formState.isSubmitting ? (
-              <Loader2Icon className="animate-spin" aria-hidden="true" />
-            ) : null}
+            {form.formState.isSubmitting ? <Spinner /> : null}
             Create account
           </Button>
         </form>

@@ -22,7 +22,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 import { cn } from "@/lib/utils";
 import {
   hasActiveFilters,
@@ -60,9 +66,7 @@ function FilterButton({
         >
           {label}
           {count > 0 ? (
-            <span className="rounded bg-primary px-1 text-[10px] leading-4 text-primary-foreground">
-              {count}
-            </span>
+            <Badge className="h-4 min-w-4 rounded-sm px-1 text-[10px] tabular-nums">{count}</Badge>
           ) : null}
           <ChevronDownIcon className="opacity-50" aria-hidden="true" />
         </Button>
@@ -115,19 +119,24 @@ export function IssueListToolbar({
 
   return (
     <div className="flex flex-wrap items-center gap-2" aria-busy={isPending}>
-      <div className="relative w-full sm:w-64">
-        <SearchIcon
-          className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
-          aria-hidden="true"
-        />
-        <Input
+      <InputGroup className="h-8 w-full sm:w-64">
+        <InputGroupAddon>
+          <SearchIcon aria-hidden="true" />
+        </InputGroupAddon>
+        <InputGroupInput
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search summary or key"
           aria-label="Search issues"
-          className="h-8 pl-8"
         />
-      </div>
+        {q ? (
+          <InputGroupAddon align="inline-end">
+            <InputGroupButton size="icon-xs" aria-label="Clear search" onClick={() => setQ("")}>
+              <XIcon aria-hidden="true" />
+            </InputGroupButton>
+          </InputGroupAddon>
+        ) : null}
+      </InputGroup>
 
       <FilterButton label="Status" count={filters.statusIds.length}>
         {statuses.map((s) => (
@@ -170,7 +179,7 @@ export function IssueListToolbar({
             onCheckedChange={() => apply({ types: toggle(filters.types, t) })}
             onSelect={(e) => e.preventDefault()}
           >
-            <IssueTypeIcon type={t} /> {ISSUE_TYPE_LABELS[t]}
+            <IssueTypeIcon type={t} tooltip={false} /> {ISSUE_TYPE_LABELS[t]}
           </DropdownMenuCheckboxItem>
         ))}
       </FilterButton>
@@ -183,7 +192,7 @@ export function IssueListToolbar({
             onCheckedChange={() => apply({ priorities: toggle(filters.priorities, p) })}
             onSelect={(e) => e.preventDefault()}
           >
-            <PriorityIcon priority={p} /> {PRIORITY_LABELS[p]}
+            <PriorityIcon priority={p} tooltip={false} /> {PRIORITY_LABELS[p]}
           </DropdownMenuCheckboxItem>
         ))}
       </FilterButton>

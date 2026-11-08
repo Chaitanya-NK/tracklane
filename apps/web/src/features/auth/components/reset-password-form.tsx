@@ -1,7 +1,6 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2Icon } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -20,6 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
 import { resetPasswordSchema } from "../schemas";
+import { Spinner } from "@/components/ui/spinner";
 
 export function ResetPasswordForm() {
   const router = useRouter();
@@ -92,9 +92,7 @@ export function ResetPasswordForm() {
           )}
         />
         <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-          {form.formState.isSubmitting ? (
-            <Loader2Icon className="animate-spin" aria-hidden="true" />
-          ) : null}
+          {form.formState.isSubmitting ? <Spinner /> : null}
           Update password
         </Button>
       </form>

@@ -1,15 +1,19 @@
 "use client";
 
 import { TimeAgo } from "@/components/shared/time-ago";
-import { DownloadIcon, FileIcon, Loader2Icon, PaperclipIcon, Trash2Icon } from "lucide-react";
+import { DownloadIcon, FileIcon, PaperclipIcon, Trash2Icon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAction } from "next-safe-action/hooks";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatBytes } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { deleteAttachmentAction } from "../server/actions";
+import { Spinner } from "@/components/ui/spinner";
 
 export interface AttachmentItem {
   id: string;
@@ -41,7 +45,12 @@ export function IssueAttachments({
   const input = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(0);
   const [dragging, setDragging] = useState(false);
+  const [toRemove, setToRemove] = useState<AttachmentItem | null>(null);
   const remove = useAction(deleteAttachmentAction, {
+    onSuccess: () => {
+      toast.success(`Removed ${toRemove?.filename ?? "attachment"}`);
+      setToRemove(null);
+    },
     onError: ({ error }) => toast.error(error.serverError?.message ?? "Couldn't remove the file"),
   });
 
@@ -59,7 +68,9 @@ export function IssueAttachments({
         body.append("file", file);
         try {
           const res = await fetch(`/api/issues/${issueId}/attachments`, { method: "POST", body });
-          if (!res.ok) {
+          if (res.ok) {
+            toast.success(`Attached ${file.name}`);
+          } else {
             const payload = (await res.json().catch(() => null)) as {
               error?: { message?: string };
             } | null;
@@ -101,7 +112,7 @@ export function IssueAttachments({
         </h2>
         {canUpload ? (
           <>
-            <input
+            <Input
               ref={input}
               type="file"
               multiple
@@ -118,11 +129,7 @@ export function IssueAttachments({
               onClick={() => input.current?.click()}
               disabled={uploading > 0}
             >
-              {uploading > 0 ? (
-                <Loader2Icon className="animate-spin" aria-hidden="true" />
-              ) : (
-                <PaperclipIcon aria-hidden="true" />
-              )}
+              {uploading > 0 ? <Spinner /> : <PaperclipIcon aria-hidden="true" />}
               {uploading > 0 ? "Uploading…" : "Attach"}
             </Button>
           </>
@@ -164,9 +171,12 @@ export function IssueAttachments({
                 </a>
                 <div className="flex items-center gap-1 p-2">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium" title={a.filename}>
-                      {a.filename}
-                    </p>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <p className="truncate text-sm font-medium">{a.filename}</p>
+                      </TooltipTrigger>
+                      <TooltipContent>{a.filename}</TooltipContent>
+                    </Tooltip>
                     <p className="text-xs text-muted-foreground">
                       {formatBytes(a.size)} · <TimeAgo date={a.createdAt} />
                     </p>
@@ -182,11 +192,7 @@ export function IssueAttachments({
                       size="icon"
                       className="size-7 hover:text-destructive"
                       aria-label={`Remove ${a.filename}`}
-                      disabled={remove.isPending}
-                      onClick={() => {
-                        if (window.confirm(`Remove ${a.filename}?`))
-                          remove.execute({ attachmentId: a.id });
-                      }}
+                      onClick={() => setToRemove(a)}
                     >
                       <Trash2Icon aria-hidden="true" />
                     </Button>
@@ -197,6 +203,15 @@ export function IssueAttachments({
           })}
         </ul>
       )}
+      <ConfirmDialog
+        open={toRemove !== null}
+        onOpenChange={(open) => !open && setToRemove(null)}
+        title={`Remove ${toRemove?.filename ?? "attachment"}?`}
+        description="The file is deleted for everyone. This can't be undone."
+        confirmLabel="Remove"
+        pending={remove.isPending}
+        onConfirm={() => toRemove && remove.execute({ attachmentId: toRemove.id })}
+      />
     </section>
   );
 }

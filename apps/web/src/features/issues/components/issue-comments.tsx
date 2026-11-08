@@ -1,15 +1,16 @@
 "use client";
 
 import { TimeAgo } from "@/components/shared/time-ago";
-import { Loader2Icon } from "lucide-react";
 import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { Markdown } from "@/components/shared/markdown";
 import { MarkdownEditor } from "@/components/shared/markdown-editor";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import { Button } from "@/components/ui/button";
 import { addCommentAction, deleteCommentAction, updateCommentAction } from "../server/actions";
+import { Spinner } from "@/components/ui/spinner";
 
 export interface CommentItem {
   id: string;
@@ -22,11 +23,19 @@ export interface CommentItem {
 function Comment({ comment, canManage }: { comment: CommentItem; canManage: boolean }) {
   const [editing, setEditing] = useState(false);
   const [body, setBody] = useState(comment.body);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const update = useAction(updateCommentAction, {
-    onSuccess: () => setEditing(false),
+    onSuccess: () => {
+      setEditing(false);
+      toast.success("Comment updated");
+    },
     onError: ({ error }) => toast.error(error.serverError?.message ?? "Couldn't save the comment"),
   });
   const remove = useAction(deleteCommentAction, {
+    onSuccess: () => {
+      setConfirmDelete(false);
+      toast.success("Comment deleted");
+    },
     onError: ({ error }) =>
       toast.error(error.serverError?.message ?? "Couldn't delete the comment"),
   });
@@ -71,25 +80,31 @@ function Comment({ comment, canManage }: { comment: CommentItem; canManage: bool
           <Markdown>{comment.body}</Markdown>
         )}
         {canManage && !editing ? (
-          <div className="flex gap-3 text-xs text-muted-foreground">
-            <button
-              type="button"
-              className="hover:text-foreground"
+          <div className="-ml-2 flex gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs text-muted-foreground"
               onClick={() => setEditing(true)}
             >
               Edit
-            </button>
-            <button
-              type="button"
-              className="hover:text-destructive"
-              disabled={remove.isPending}
-              onClick={() => {
-                if (window.confirm("Delete this comment?"))
-                  remove.execute({ commentId: comment.id });
-              }}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs text-muted-foreground hover:text-destructive"
+              onClick={() => setConfirmDelete(true)}
             >
               Delete
-            </button>
+            </Button>
+            <ConfirmDialog
+              open={confirmDelete}
+              onOpenChange={setConfirmDelete}
+              title="Delete this comment?"
+              description="This can't be undone."
+              pending={remove.isPending}
+              onConfirm={() => remove.execute({ commentId: comment.id })}
+            />
           </div>
         ) : null}
       </div>
@@ -112,7 +127,10 @@ export function IssueComments({
 }) {
   const [body, setBody] = useState("");
   const add = useAction(addCommentAction, {
-    onSuccess: () => setBody(""),
+    onSuccess: () => {
+      setBody("");
+      toast.success("Comment added");
+    },
     onError: ({ error }) => toast.error(error.serverError?.message ?? "Couldn't add the comment"),
   });
   const submit = () => body.trim() && add.execute({ issueId, body });
@@ -133,7 +151,7 @@ export function IssueComments({
             />
             {body.trim() ? (
               <Button size="sm" onClick={submit} disabled={add.isPending}>
-                {add.isPending ? <Loader2Icon className="animate-spin" aria-hidden="true" /> : null}
+                {add.isPending ? <Spinner /> : null}
                 Comment
               </Button>
             ) : null}

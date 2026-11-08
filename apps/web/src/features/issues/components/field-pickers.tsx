@@ -228,7 +228,7 @@ export function ParentPicker({
       trigger={
         selected ? (
           <>
-            <IssueTypeIcon type={selected.type} />
+            <IssueTypeIcon type={selected.type} tooltip={false} />
             <span className="font-mono text-xs text-muted-foreground">
               {projectKey}-{selected.number}
             </span>
@@ -258,7 +258,7 @@ export function ParentPicker({
                   value={`${projectKey}-${p.number} ${p.title}`}
                   onSelect={() => (onChange(p.id), close())}
                 >
-                  <IssueTypeIcon type={p.type} />
+                  <IssueTypeIcon type={p.type} tooltip={false} />
                   <span className="font-mono text-xs text-muted-foreground">
                     {projectKey}-{p.number}
                   </span>

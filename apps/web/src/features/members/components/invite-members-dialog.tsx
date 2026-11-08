@@ -1,7 +1,7 @@
 "use client";
 
 import { ROLE_DESCRIPTIONS, ROLE_LABELS, type WorkspaceRole } from "@tracklane/core";
-import { CheckIcon, CopyIcon, Loader2Icon, UserPlusIcon } from "lucide-react";
+import { CheckIcon, CopyIcon, UserPlusIcon } from "lucide-react";
 import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -16,7 +16,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import {
   Select,
   SelectContent,
@@ -27,6 +27,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { inviteMembersAction } from "../server/actions";
 import { parseEmailList } from "../utils";
+import { Spinner } from "@/components/ui/spinner";
 
 function CopyLinkButton({ url }: { url: string }) {
   const [copied, setCopied] = useState(false);
@@ -132,8 +133,8 @@ export function InviteMembersDialog({ slug, roles }: { slug: string; roles: Work
                 <AlertDescription>{result.serverError.message}</AlertDescription>
               </Alert>
             ) : null}
-            <div className="space-y-2">
-              <Label htmlFor="invite-emails">Email addresses</Label>
+            <Field data-invalid={Boolean(inputError) || undefined}>
+              <FieldLabel htmlFor="invite-emails">Email addresses</FieldLabel>
               <Textarea
                 id="invite-emails"
                 rows={4}
@@ -143,18 +144,16 @@ export function InviteMembersDialog({ slug, roles }: { slug: string; roles: Work
                 aria-invalid={Boolean(inputError)}
                 aria-describedby="invite-emails-help"
               />
-              <p
-                id="invite-emails-help"
-                className={
-                  inputError ? "text-sm text-destructive" : "text-sm text-muted-foreground"
-                }
-              >
-                {inputError ??
-                  "Separate addresses with commas, spaces or new lines. Up to 20 at a time."}
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="invite-role">Role</Label>
+              {inputError ? (
+                <FieldError id="invite-emails-help">{inputError}</FieldError>
+              ) : (
+                <FieldDescription id="invite-emails-help">
+                  Separate addresses with commas, spaces or new lines. Up to 20 at a time.
+                </FieldDescription>
+              )}
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="invite-role">Role</FieldLabel>
               <Select value={role} onValueChange={(v) => setRole(v as WorkspaceRole)}>
                 <SelectTrigger id="invite-role" className="w-full">
                   <SelectValue />
@@ -167,11 +166,11 @@ export function InviteMembersDialog({ slug, roles }: { slug: string; roles: Work
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-sm text-muted-foreground">{ROLE_DESCRIPTIONS[role]}</p>
-            </div>
+              <FieldDescription>{ROLE_DESCRIPTIONS[role]}</FieldDescription>
+            </Field>
             <DialogFooter>
               <Button type="submit" disabled={isPending}>
-                {isPending ? <Loader2Icon className="animate-spin" aria-hidden="true" /> : null}
+                {isPending ? <Spinner /> : null}
                 Send invitations{valid.length > 1 ? ` (${valid.length})` : ""}
               </Button>
             </DialogFooter>

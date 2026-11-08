@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2Icon, MailCheckIcon } from "lucide-react";
+import { MailCheckIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -18,6 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
 import { forgotPasswordSchema } from "../schemas";
+import { Spinner } from "@/components/ui/spinner";
 
 export function ForgotPasswordForm() {
   const [sentTo, setSentTo] = useState<string | null>(null);
@@ -66,9 +67,7 @@ export function ForgotPasswordForm() {
           )}
         />
         <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-          {form.formState.isSubmitting ? (
-            <Loader2Icon className="animate-spin" aria-hidden="true" />
-          ) : null}
+          {form.formState.isSubmitting ? <Spinner /> : null}
           Send reset link
         </Button>
         <p className="text-center text-sm text-muted-foreground">

@@ -3,6 +3,14 @@ import type { Metadata, Route } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -77,39 +85,52 @@ async function IssueView({ params }: { params: Props["params"] }) {
       <div className="min-w-0 space-y-8">
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-sm">
-            <nav
-              aria-label="Breadcrumb"
-              className="flex min-w-0 items-center gap-1.5 text-muted-foreground"
-            >
-              <Link href={`/${slug}/projects` as Route} className="hover:text-foreground">
-                Projects
-              </Link>
-              <span aria-hidden="true">/</span>
-              <Link
-                href={`/${slug}/projects/${issue.project.key}` as Route}
-                className="flex items-center gap-1.5 truncate hover:text-foreground"
-              >
-                <ProjectAvatar projectKey={issue.project.key} className="size-4 text-[6px]" />
-                {issue.project.name}
-              </Link>
-              {issue.parent ? (
-                <>
-                  <span aria-hidden="true">/</span>
-                  <Link
-                    href={`/${slug}/issues/${issue.project.key}-${issue.parent.number}` as Route}
-                    className="flex items-center gap-1.5 hover:text-foreground"
-                  >
-                    <IssueTypeIcon type={issue.parent.type} />
-                    {issue.project.key}-{issue.parent.number}
-                  </Link>
-                </>
-              ) : null}
-              <span aria-hidden="true">/</span>
-              <span className="flex items-center gap-1.5 font-medium text-foreground">
-                <IssueTypeIcon type={issue.type} />
-                {key}
-              </span>
-            </nav>
+            <Breadcrumb className="min-w-0">
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbLink asChild>
+                    <Link href={`/${slug}/projects` as Route}>Projects</Link>
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbLink asChild>
+                    <Link
+                      href={`/${slug}/projects/${issue.project.key}` as Route}
+                      className="flex items-center gap-1.5"
+                    >
+                      <ProjectAvatar projectKey={issue.project.key} className="size-4 text-[6px]" />
+                      {issue.project.name}
+                    </Link>
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                {issue.parent ? (
+                  <>
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                      <BreadcrumbLink asChild>
+                        <Link
+                          href={
+                            `/${slug}/issues/${issue.project.key}-${issue.parent.number}` as Route
+                          }
+                          className="flex items-center gap-1.5"
+                        >
+                          <IssueTypeIcon type={issue.parent.type} tooltip={false} />
+                          {issue.project.key}-{issue.parent.number}
+                        </Link>
+                      </BreadcrumbLink>
+                    </BreadcrumbItem>
+                  </>
+                ) : null}
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbPage className="flex items-center gap-1.5">
+                    <IssueTypeIcon type={issue.type} tooltip={false} />
+                    {key}
+                  </BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
             <div className="ml-auto">
               <IssueActionsMenu
                 slug={slug}

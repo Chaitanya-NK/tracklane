@@ -2,7 +2,6 @@
 
 import { workspaceNameSchema, workspaceSlugSchema } from "@tracklane/core";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2Icon } from "lucide-react";
 import { useAction } from "next-safe-action/hooks";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -19,6 +18,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { updateWorkspaceAction } from "../server/actions";
+import { Spinner } from "@/components/ui/spinner";
 
 const schema = z.object({ name: workspaceNameSchema, slug: workspaceSlugSchema });
 
@@ -88,9 +88,7 @@ export function WorkspaceGeneralForm({
         </fieldset>
         {canEdit ? (
           <Button type="submit" disabled={!form.formState.isDirty || form.formState.isSubmitting}>
-            {form.formState.isSubmitting ? (
-              <Loader2Icon className="animate-spin" aria-hidden="true" />
-            ) : null}
+            {form.formState.isSubmitting ? <Spinner /> : null}
             Save changes
           </Button>
         ) : (

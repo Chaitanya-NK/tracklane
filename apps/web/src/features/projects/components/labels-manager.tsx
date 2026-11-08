@@ -1,16 +1,18 @@
 "use client";
 
 import { LABEL_COLORS, type LabelColor } from "@tracklane/core";
-import { Loader2Icon, PlusIcon } from "lucide-react";
+import { PlusIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { LabelBadge, LABEL_SWATCH } from "@/features/issues";
 import { cn } from "@/lib/utils";
 import { createLabelAction } from "../server/actions";
+import { Spinner } from "@/components/ui/spinner";
 
 export function LabelsManager({
   slug,
@@ -62,29 +64,21 @@ export function LabelsManager({
             maxLength={40}
             className="h-8 w-48"
           />
-          <div className="flex gap-1" role="radiogroup" aria-label="Label colour">
+          <ToggleGroup
+            type="single"
+            size="sm"
+            value={color}
+            onValueChange={(value) => value && setColor(value as LabelColor)}
+            aria-label="Label colour"
+          >
             {LABEL_COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                role="radio"
-                aria-checked={color === c}
-                aria-label={c}
-                onClick={() => setColor(c)}
-                className={cn(
-                  "size-5 rounded-full ring-offset-2 ring-offset-background",
-                  LABEL_SWATCH[c],
-                  color === c && "ring-2 ring-ring",
-                )}
-              />
+              <ToggleGroupItem key={c} value={c} aria-label={c} className="size-8 px-0">
+                <span className={cn("size-4 rounded-full", LABEL_SWATCH[c])} aria-hidden="true" />
+              </ToggleGroupItem>
             ))}
-          </div>
+          </ToggleGroup>
           <Button type="submit" size="sm" variant="outline" disabled={isPending || !name.trim()}>
-            {isPending ? (
-              <Loader2Icon className="animate-spin" aria-hidden="true" />
-            ) : (
-              <PlusIcon aria-hidden="true" />
-            )}
+            {isPending ? <Spinner /> : <PlusIcon aria-hidden="true" />}
             Add label
           </Button>
         </form>

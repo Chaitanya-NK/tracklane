@@ -19,6 +19,8 @@ import {
   SquareCheckIcon,
   ZapIcon,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 const TYPE_STYLE: Record<IssueType, { icon: LucideIcon; className: string }> = {
@@ -29,20 +31,35 @@ const TYPE_STYLE: Record<IssueType, { icon: LucideIcon; className: string }> = {
   subtask: { icon: ListTreeIcon, className: "bg-cyan-600 text-white" },
 };
 
-export function IssueTypeIcon({ type, className }: { type: IssueType; className?: string }) {
+/** Coloured issue-type glyph. Pass `tooltip={false}` inside menus/selects that already show the name. */
+export function IssueTypeIcon({
+  type,
+  className,
+  tooltip = true,
+}: {
+  type: IssueType;
+  className?: string;
+  tooltip?: boolean;
+}) {
   const { icon: Icon, className: tone } = TYPE_STYLE[type];
-  return (
+  const glyph = (
     <span
       className={cn(
         "inline-flex size-4 shrink-0 items-center justify-center rounded-[4px]",
         tone,
         className,
       )}
-      title={ISSUE_TYPE_LABELS[type]}
     >
       <Icon className="size-3" aria-hidden="true" strokeWidth={2.5} />
       <span className="sr-only">{ISSUE_TYPE_LABELS[type]}</span>
     </span>
+  );
+  if (!tooltip) return glyph;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{glyph}</TooltipTrigger>
+      <TooltipContent>{ISSUE_TYPE_LABELS[type]}</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -54,23 +71,35 @@ const PRIORITY_STYLE: Record<Priority, { icon: LucideIcon; className: string }> 
   lowest: { icon: ChevronsDownIcon, className: "text-sky-400" },
 };
 
-export function PriorityIcon({ priority, className }: { priority: Priority; className?: string }) {
+export function PriorityIcon({
+  priority,
+  className,
+  tooltip = true,
+}: {
+  priority: Priority;
+  className?: string;
+  tooltip?: boolean;
+}) {
   const { icon: Icon, className: tone } = PRIORITY_STYLE[priority];
-  return (
-    <span
-      className={cn("inline-flex shrink-0", tone, className)}
-      title={`${PRIORITY_LABELS[priority]} priority`}
-    >
+  const glyph = (
+    <span className={cn("inline-flex shrink-0", tone, className)}>
       <Icon className="size-4" aria-hidden="true" strokeWidth={2.5} />
       <span className="sr-only">{PRIORITY_LABELS[priority]} priority</span>
     </span>
   );
+  if (!tooltip) return glyph;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{glyph}</TooltipTrigger>
+      <TooltipContent>{PRIORITY_LABELS[priority]} priority</TooltipContent>
+    </Tooltip>
+  );
 }
 
 const STATUS_STYLE: Record<StatusCategory, string> = {
-  todo: "bg-muted text-muted-foreground border-transparent",
-  in_progress: "bg-status-in-progress/12 text-status-in-progress border-transparent",
-  done: "bg-status-done/12 text-status-done border-transparent",
+  todo: "bg-muted text-muted-foreground",
+  in_progress: "bg-status-in-progress/12 text-status-in-progress",
+  done: "bg-status-done/12 text-status-done",
 };
 
 export function StatusBadge({
@@ -81,15 +110,16 @@ export function StatusBadge({
   className?: string;
 }) {
   return (
-    <span
+    <Badge
+      variant="secondary"
       className={cn(
-        "inline-flex h-5 items-center rounded border px-1.5 text-[11px] font-semibold tracking-wide whitespace-nowrap uppercase",
+        "h-5 rounded px-1.5 text-[11px] font-semibold tracking-wide uppercase",
         STATUS_STYLE[status.category],
         className,
       )}
     >
       {status.name}
-    </span>
+    </Badge>
   );
 }
 
@@ -120,13 +150,8 @@ export const LABEL_SWATCH: Record<LabelColor, string> = {
 export function LabelBadge({ label }: { label: { name: string; color: string } }) {
   const tone = LABEL_STYLE[label.color as LabelColor] ?? LABEL_STYLE.gray;
   return (
-    <span
-      className={cn(
-        "inline-flex h-5 items-center rounded px-1.5 text-xs font-medium whitespace-nowrap",
-        tone,
-      )}
-    >
+    <Badge variant="secondary" className={cn("h-5 rounded px-1.5", tone)}>
       {label.name}
-    </span>
+    </Badge>
   );
 }
