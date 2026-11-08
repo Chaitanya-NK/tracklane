@@ -2,9 +2,10 @@
 # Runs once when the Codespace / dev container is created.
 set -euo pipefail
 
-echo "▸ Enabling pnpm"
-corepack enable
-corepack prepare pnpm@10.28.0 --activate
+echo "▸ Enabling pnpm (via corepack)"
+# corepack writes shims next to the node binary, which needs root in the dev container image.
+sudo corepack enable || npm install -g pnpm@10.28.0
+pnpm --version
 
 echo "▸ Creating .env from .env.example (if missing)"
 [ -f .env ] || cp .env.example .env
