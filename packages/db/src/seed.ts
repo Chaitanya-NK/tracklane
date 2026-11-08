@@ -258,6 +258,7 @@ async function seedDemoProject(workspaceId: string, demoUserId: string) {
     ids.push(issue.id);
   }
   await db.project.update({ where: { id: project.id }, data: { issueCounter: issues.length } });
+  await seedSprints(project.id, ids, dateIn);
 
   await db.comment.createMany({
     data: [
@@ -291,3 +292,52 @@ main()
     process.exitCode = 1;
   })
   .finally(() => db.$disconnect());
+
+/**
+ * Sprint history for the demo project: Sprint 1 completed, Sprint 2 active (today is mid-sprint),
+ * Sprint 3 planned. Issue numbers below are 1-based indexes into the seeded issues.
+ */
+async function seedSprints(projectId: string, issueIds: string[], dateIn: (days: number) => Date) {
+  const issue = (n: number) => issueIds[n - 1]!;
+  const sprint1 = await db.sprint.create({
+    data: {
+      projectId,
+      name: "WEB Sprint 1",
+      goal: "Ship the analytics upgrade and the checkout groundwork",
+      state: "completed",
+      startDate: dateIn(-24),
+      endDate: dateIn(-10),
+      startedAt: dateIn(-24),
+      completedAt: dateIn(-10),
+      committedPoints: 3,
+      completedPoints: 3,
+      completedIssues: 2,
+      incompleteIssues: 0,
+    },
+  });
+  const sprint2 = await db.sprint.create({
+    data: {
+      projectId,
+      name: "WEB Sprint 2",
+      goal: "Single-page checkout behind a feature flag; fix 3-D Secure payments",
+      state: "active",
+      startDate: dateIn(-5),
+      endDate: dateIn(9),
+      startedAt: dateIn(-5),
+      committedPoints: 20,
+    },
+  });
+  const sprint3 = await db.sprint.create({
+    data: { projectId, name: "WEB Sprint 3", goal: "Performance and polish" },
+  });
+  await db.issue.updateMany({
+    where: { id: { in: [issue(8), issue(5)] } },
+    data: { sprintId: sprint1.id },
+  });
+  await db.issue.updateMany({
+    where: { id: { in: [issue(2), issue(3), issue(4), issue(6), issue(9)] } },
+    data: { sprintId: sprint2.id },
+  });
+  await db.issue.updateMany({ where: { id: { in: [issue(7)] } }, data: { sprintId: sprint3.id } });
+  await db.project.update({ where: { id: projectId }, data: { sprintCounter: 3 } });
+}

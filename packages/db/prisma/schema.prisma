@@ -207,20 +207,22 @@ enum Priority {
 }
 
 model Project {
-  id           String      @id @default(cuid())
-  workspaceId  String      @map("workspace_id")
+  id            String      @id @default(cuid())
+  workspaceId   String      @map("workspace_id")
   /// Prefix of issue keys (PAY → PAY-12). Unique per workspace, fixed after creation.
-  key          String
-  name         String
-  description  String      @default("")
-  type         ProjectType @default(scrum)
-  leadId       String?     @map("lead_id")
+  key           String
+  name          String
+  description   String      @default("")
+  type          ProjectType @default(scrum)
+  leadId        String?     @map("lead_id")
   /// Last issue number handed out; incremented atomically when an issue is created.
-  issueCounter Int         @default(0) @map("issue_counter")
-  createdById  String?     @map("created_by_id")
-  archivedAt   DateTime?   @map("archived_at")
-  createdAt    DateTime    @default(now()) @map("created_at")
-  updatedAt    DateTime    @updatedAt @map("updated_at")
+  issueCounter  Int         @default(0) @map("issue_counter")
+  /// Last sprint number handed out ("WEB Sprint 4").
+  sprintCounter Int         @default(0) @map("sprint_counter")
+  createdById   String?     @map("created_by_id")
+  archivedAt    DateTime?   @map("archived_at")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
 
   workspace Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   lead      User?            @relation("ProjectLead", fields: [leadId], references: [id], onDelete: SetNull)
@@ -228,6 +230,7 @@ model Project {
   statuses  WorkflowStatus[]
   issues    Issue[]
   labels    Label[]
+  sprints   Sprint[]
 
   @@unique([workspaceId, key])
   @@map("projects")
@@ -269,8 +272,10 @@ model Issue {
   dueDate     DateTime? @map("due_date") @db.Date
   /// Story points.
   estimate    Int?
-  /// Manual order within a status (boards and backlog, Phase 3).
+  /// Rank within the project: one ordering shared by the board and the backlog.
   position    Float     @default(0)
+  /// Null = in the backlog.
+  sprintId    String?   @map("sprint_id")
   resolvedAt  DateTime? @map("resolved_at")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
@@ -281,6 +286,7 @@ model Issue {
   assignee    User?           @relation("IssueAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
   reporter    User?           @relation("IssueReporter", fields: [reporterId], references: [id], onDelete: SetNull)
   parent      Issue?          @relation("IssueParent", fields: [parentId], references: [id], onDelete: SetNull)
+  sprint      Sprint?         @relation(fields: [sprintId], references: [id], onDelete: SetNull)
   children    Issue[]         @relation("IssueParent")
   labels      IssueLabel[]
   comments    Comment[]
@@ -291,6 +297,8 @@ model Issue {
   @@index([workspaceId, assigneeId])
   @@index([projectId, statusId])
   @@index([parentId])
+  @@index([sprintId])
+  @@index([projectId, position])
   @@map("issues")
 }
 
@@ -375,4 +383,39 @@ model IssueActivity {
 
   @@index([issueId, createdAt])
   @@map("issue_activities")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sprints
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum SprintState {
+  planned
+  active
+  completed
+}
+
+model Sprint {
+  id               String      @id @default(cuid())
+  projectId        String      @map("project_id")
+  name             String
+  goal             String      @default("")
+  state            SprintState @default(planned)
+  startDate        DateTime?   @map("start_date") @db.Date
+  endDate          DateTime?   @map("end_date") @db.Date
+  startedAt        DateTime?   @map("started_at")
+  completedAt      DateTime?   @map("completed_at")
+  /// Snapshot when the sprint starts / completes, for velocity and sprint reports.
+  committedPoints  Int?        @map("committed_points")
+  completedPoints  Int?        @map("completed_points")
+  completedIssues  Int?        @map("completed_issues")
+  incompleteIssues Int?        @map("incomplete_issues")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  issues  Issue[]
+
+  @@index([projectId, state])
+  @@map("sprints")
 }
