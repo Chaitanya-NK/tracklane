@@ -1,0 +1,26 @@
+{
+  "name": "@tracklane/email",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Transactional email: SMTP transport (Mailpit in development) and templates.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "nodemailer": "^7.0.0"
+  },
+  "devDependencies": {
+    "@tracklane/config": "workspace:*",
+    "@types/node": "^22.0.0",
+    "@types/nodemailer": "^7.0.0",
+    "eslint": "^9.39.0",
+    "typescript": "^5.9.0",
+    "vitest": "^4.0.0"
+  }
+}
