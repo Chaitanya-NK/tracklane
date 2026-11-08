@@ -1,6 +1,14 @@
 import type { TqlExpr, TqlOrder, TqlQuery, TqlValue } from "./ast";
 import { isDateLiteral } from "./dates";
-import { type FieldDef, findField, type Operator, TQL_FIELDS } from "./fields";
+import {
+  BUILTIN_CONDITION_FUNCTIONS,
+  customFieldDef,
+  type FieldDef,
+  findField,
+  type Operator,
+  TQL_FIELDS,
+  type TqlParseOptions,
+} from "./fields";
 import { type Token, tokenize, TqlError } from "./lexer";
 
 const KEYWORDS = new Set([
@@ -19,7 +27,15 @@ const KEYWORDS = new Set([
 
 class Parser {
   private i = 0;
-  constructor(private readonly tokens: Token[]) {}
+  private readonly customFields: Map<string, FieldDef>;
+  constructor(
+    private readonly tokens: Token[],
+    private readonly options: TqlParseOptions = {},
+  ) {
+    this.customFields = new Map(
+      (options.customFields ?? []).map((f) => [f.name.toLowerCase(), customFieldDef(f)]),
+    );
+  }
 
   private peek(offset = 0) {
     return this.tokens[Math.min(this.i + offset, this.tokens.length - 1)]!;
@@ -109,11 +125,49 @@ class Parser {
     if (t.type !== "word" && t.type !== "string")
       throw new TqlError(`Expected a field name, found "${t.value}"`, t.start, t.end);
     this.next();
+    if (t.type === "word" && this.peek().type === "lparen") return this.call(t);
     return this.clause(this.field(t));
   }
 
+  /** A condition function call: name() or filter("Saved filter"). */
+  private call(t: Token): TqlExpr {
+    this.next(); // (
+    let arg: string | undefined;
+    if (this.peek().type === "string" || this.peek().type === "word") arg = this.next().value;
+    const close = this.next();
+    if (close.type !== "rparen")
+      throw new TqlError("Missing closing parenthesis", close.start, close.end);
+    const builtin = BUILTIN_CONDITION_FUNCTIONS.find(
+      (f) => f.name.toLowerCase() === t.value.toLowerCase(),
+    );
+    if (builtin) {
+      if (!arg)
+        throw new TqlError(
+          `${builtin.name}() needs a name, e.g. ${builtin.name}("Open bugs")`,
+          t.start,
+          close.end,
+        );
+      return { type: "call", name: builtin.name, arg, builtin: true };
+    }
+    const custom = this.options.functions?.find(
+      (f) => f.kind === "condition" && f.name.toLowerCase() === t.value.toLowerCase(),
+    );
+    if (!custom) {
+      const known =
+        this.options.functions?.filter((f) => f.kind === "condition").map((f) => `${f.name}()`) ??
+        [];
+      throw new TqlError(
+        `Unknown function ${t.value}()${known.length ? `. Defined conditions: ${known.join(", ")}` : ""}`,
+        t.start,
+        close.end,
+      );
+    }
+    if (arg) throw new TqlError(`${custom.name}() doesn't take arguments`, t.start, close.end);
+    return { type: "call", name: custom.name, builtin: false };
+  }
+
   private field(t: Token): FieldDef {
-    const field = findField(t.value);
+    const field = findField(t.value) ?? this.customFields.get(t.value.toLowerCase());
     if (!field) {
       const known = TQL_FIELDS.map((f) => f.name).join(", ");
       throw new TqlError(`Unknown field "${t.value}". Try one of: ${known}`, t.start, t.end);
@@ -161,6 +215,14 @@ class Parser {
     if (op === "is empty" || op === "is not empty")
       return { type: "clause", field: field.name, op, value: { kind: "empty" } };
     if (op === "in" || op === "not in") {
+      // `assignee IN myTeam()` — a function standing for the whole list.
+      if (this.peek().type === "word" && this.peek(1).type === "lparen") {
+        const at = this.peek();
+        const value = this.value(field);
+        if (value.kind !== "function")
+          throw new TqlError(`Expected "(" after ${op.toUpperCase()}`, at.start, at.end);
+        return { type: "clause", field: field.name, op, value };
+      }
       const open = this.next();
       if (open.type !== "lparen")
         throw new TqlError(`Expected "(" after ${op.toUpperCase()}`, open.start, open.end);
@@ -192,6 +254,13 @@ class Parser {
         throw new TqlError("Functions take no arguments: write name()", close.start, close.end);
       const allowed = field.functions ?? [];
       const name = allowed.find((f) => f.toLowerCase() === t.value.toLowerCase());
+      const custom = this.options.functions?.find(
+        (f) =>
+          f.kind === "values" &&
+          f.valueKind === field.kind &&
+          f.name.toLowerCase() === t.value.toLowerCase(),
+      );
+      if (!name && custom) return { kind: "function", name: custom.name, custom: true };
       if (!name) {
         throw new TqlError(
           allowed.length
@@ -229,8 +298,26 @@ class Parser {
         t.end,
       );
     }
-    if (field.kind === "number" && !/^\d+$/.test(value.value)) {
-      throw new TqlError(`${field.name} must be a whole number`, t.start, t.end);
+    if (
+      field.kind === "number" &&
+      !(field.custom ? /^-?\d+(\.\d+)?$/ : /^\d+$/).test(value.value)
+    ) {
+      throw new TqlError(
+        `${field.name} must be a ${field.custom ? "number" : "whole number"}`,
+        t.start,
+        t.end,
+      );
+    }
+    if (field.kind === "option" && field.custom?.options) {
+      const match = field.custom.options.find((o) => o.toLowerCase() === value.value.toLowerCase());
+      if (!match) {
+        throw new TqlError(
+          `"${value.value}" isn't an option of ${field.custom.name}. Use ${field.custom.options.join(", ")}`,
+          t.start,
+          t.end,
+        );
+      }
+      return { ...value, value: match };
     }
     return value;
   }
@@ -239,9 +326,9 @@ class Parser {
 export type TqlParseResult = { ok: true; query: TqlQuery } | { ok: false; error: TqlError };
 
 /** Parses TQL. An empty string is a valid query that matches everything. */
-export function parseTql(input: string): TqlParseResult {
+export function parseTql(input: string, options?: TqlParseOptions): TqlParseResult {
   try {
-    return { ok: true, query: new Parser(tokenize(input)).parse() };
+    return { ok: true, query: new Parser(tokenize(input), options).parse() };
   } catch (error) {
     if (error instanceof TqlError) return { ok: false, error };
     throw error;

@@ -1,4 +1,4 @@
-import { ISSUE_TYPES, PRIORITIES, STATUS_CATEGORIES } from "../constants";
+import { type CustomFieldType, ISSUE_TYPES, PRIORITIES, STATUS_CATEGORIES } from "../constants";
 
 /** How a field's values are matched; decides the allowed operators and value forms. */
 export type FieldKind =
@@ -12,7 +12,9 @@ export type FieldKind =
   | "issue"
   | "text"
   | "date"
-  | "number";
+  | "number"
+  | "option"
+  | "boolean";
 
 export type Operator =
   "=" | "!=" | ">" | ">=" | "<" | "<=" | "~" | "!~" | "in" | "not in" | "is empty" | "is not empty";
@@ -29,6 +31,8 @@ export interface FieldDef {
   /** Allowed functions, e.g. currentUser(). */
   functions?: readonly string[];
   sortable: boolean;
+  /** Set for project custom fields; the canonical name is `cf:<name>`. */
+  custom?: { name: string; type: CustomFieldType; options?: readonly string[] };
 }
 
 const EQ: Operator[] = ["=", "!=", "in", "not in"];
@@ -227,4 +231,101 @@ for (const field of TQL_FIELDS) {
 
 export function findField(name: string): FieldDef | undefined {
   return byName.get(name.toLowerCase());
+}
+
+/** A project custom field as TQL sees it (any project in the workspace). */
+export interface TqlCustomFieldSignature {
+  name: string;
+  type: CustomFieldType;
+  /** Option values, for select/multi-select. */
+  options?: readonly string[];
+}
+
+/** Builds the field definition for a custom field, so it parses like a built-in one. */
+export function customFieldDef(sig: TqlCustomFieldSignature): FieldDef {
+  const base = {
+    name: `cf:${sig.name}`,
+    aliases: [],
+    description: `Custom field (${sig.type})`,
+    sortable: false,
+    custom: sig,
+  };
+  switch (sig.type) {
+    case "number":
+      return { ...base, kind: "number", operators: ["=", "!=", ...ORDERED, ...EMPTY] };
+    case "date":
+      return {
+        ...base,
+        kind: "date",
+        operators: ["=", ...ORDERED, ...EMPTY],
+        functions: DATE_FUNCTIONS,
+      };
+    case "select":
+    case "multiselect":
+      return { ...base, kind: "option", operators: [...EQ, ...EMPTY] };
+    case "user":
+      return { ...base, kind: "user", operators: [...EQ, ...EMPTY], functions: ["currentUser"] };
+    case "checkbox":
+      return { ...base, kind: "boolean", operators: ["=", "!="], values: ["true", "false"] };
+    default:
+      return { ...base, kind: "text", operators: ["~", "!~", "=", "!=", ...EMPTY] };
+  }
+}
+
+/** Functions defined in the workspace (Settings → TQL functions). */
+export interface TqlFunctionSignature {
+  name: string;
+  kind: "condition" | "values";
+  /** For value lists: the field kind they apply to (user, label, project…). */
+  valueKind?: string;
+  description?: string;
+}
+
+/** Built-in condition functions. filter("Saved filter name") reuses a saved filter. */
+export const BUILTIN_CONDITION_FUNCTIONS = [
+  { name: "filter", description: "Matches a saved filter by name", arg: true },
+] as const;
+
+export interface TqlParseOptions {
+  customFields?: readonly TqlCustomFieldSignature[];
+  functions?: readonly TqlFunctionSignature[];
+}
+
+/** Field kinds a workspace value-list function can stand in for. */
+export const TQL_VALUE_KINDS = ["user", "label", "project", "status", "sprint"] as const;
+export type TqlValueKind = (typeof TQL_VALUE_KINDS)[number];
+export const TQL_VALUE_KIND_LABELS: Record<TqlValueKind, string> = {
+  user: "People (assignee, reporter, user fields)",
+  label: "Labels",
+  project: "Projects",
+  status: "Statuses",
+  sprint: "Sprints",
+};
+
+const RESERVED_WORDS = [
+  "and",
+  "or",
+  "not",
+  "in",
+  "is",
+  "empty",
+  "null",
+  "order",
+  "by",
+  "asc",
+  "desc",
+];
+
+/** Why a name can't be used for a workspace function, or null when it can. */
+export function tqlFunctionNameProblem(name: string): string | null {
+  if (!/^[A-Za-z][A-Za-z0-9_]{1,39}$/.test(name))
+    return "Use 2–40 letters, digits or underscores, starting with a letter";
+  const lower = name.toLowerCase();
+  const builtins = [
+    ...BUILTIN_CONDITION_FUNCTIONS.map((f) => f.name),
+    ...TQL_FIELDS.flatMap((f) => [...(f.functions ?? []), f.name, ...f.aliases]),
+    ...RESERVED_WORDS,
+  ];
+  if (builtins.some((b) => b.toLowerCase() === lower)) return `"${name}" is a built-in TQL name`;
+  return null;
 }

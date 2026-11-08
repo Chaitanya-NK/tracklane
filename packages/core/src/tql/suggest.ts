@@ -1,4 +1,13 @@
-import { DATE_FUNCTIONS, findField, type FieldDef, TQL_FIELDS } from "./fields";
+import {
+  BUILTIN_CONDITION_FUNCTIONS,
+  customFieldDef,
+  DATE_FUNCTIONS,
+  type FieldDef,
+  findField,
+  TQL_FIELDS,
+  type TqlCustomFieldSignature,
+  type TqlFunctionSignature,
+} from "./fields";
 import { type Token, tokenize, TqlError } from "./lexer";
 
 /** Values that exist in the workspace, for completing project/status/user/label/sprint values. */
@@ -8,6 +17,12 @@ export interface TqlCatalog {
   users: { name: string; email: string }[];
   labels: string[];
   sprints: string[];
+  /** Custom fields across the workspace's projects. */
+  customFields?: TqlCustomFieldSignature[];
+  /** Workspace-defined functions (Settings → TQL functions). */
+  functions?: TqlFunctionSignature[];
+  /** Saved filter names visible to the user, for filter("…"). */
+  savedFilters?: string[];
 }
 
 export interface TqlSuggestion {
@@ -39,7 +54,10 @@ function valueSuggestions(field: FieldDef, catalog: TqlCatalog): TqlSuggestion[]
     detail,
     kind: "value",
   });
-  const functions = (field.functions ?? []).map(fn);
+  const custom = (catalog.functions ?? [])
+    .filter((f) => f.kind === "values" && f.valueKind === field.kind)
+    .map((f) => ({ ...fn(f.name), detail: f.description || "Custom value list" }));
+  const functions = [...(field.functions ?? []).map(fn), ...custom];
   switch (field.kind) {
     case "enum":
       return (field.values ?? []).map((value) =>
@@ -55,6 +73,10 @@ function valueSuggestions(field: FieldDef, catalog: TqlCatalog): TqlSuggestion[]
       return catalog.labels.map((l) => v(l));
     case "sprint":
       return [...functions, ...catalog.sprints.map((s) => v(s))];
+    case "option":
+      return (field.custom?.options ?? []).map((o) => v(o));
+    case "boolean":
+      return [v("true"), v("false")];
     case "date":
       return [
         v("-1d", "-1d", "since yesterday"),
@@ -66,6 +88,12 @@ function valueSuggestions(field: FieldDef, catalog: TqlCatalog): TqlSuggestion[]
       return functions;
   }
 }
+
+const savedFilterValue = (label: string): TqlSuggestion => ({
+  label,
+  insert: `"${label.replace(/"/g, '\\"')}")`,
+  kind: "value",
+});
 
 const OPERATOR_LABEL: Record<string, string> = {
   "is empty": "IS EMPTY",
@@ -79,6 +107,10 @@ const OPERATOR_LABEL: Record<string, string> = {
  * throws. The result's [from, to) is the partial word under the cursor that a pick replaces.
  */
 export function suggestTql(input: string, cursor: number, catalog: TqlCatalog): TqlSuggestions {
+  const customFields = new Map(
+    (catalog.customFields ?? []).map((f) => [f.name.toLowerCase(), customFieldDef(f)]),
+  );
+  const resolve = (name: string) => findField(name) ?? customFields.get(name.toLowerCase());
   const before = input.slice(0, cursor);
   // The word being typed (or an unclosed quoted value).
   const quoteMatch = /(["'])([^"']*)$/.exec(before);
@@ -112,13 +144,38 @@ export function suggestTql(input: string, cursor: number, catalog: TqlCatalog): 
     items: filter(items),
   });
 
-  const fields = (sortable = false) =>
-    TQL_FIELDS.filter((f) => !sortable || f.sortable).map((f) => ({
+  const fields = (sortable = false): TqlSuggestion[] => [
+    ...TQL_FIELDS.filter((f) => !sortable || f.sortable).map((f) => ({
       label: f.name,
       insert: f.name,
       detail: f.description,
       kind: "field" as const,
-    }));
+    })),
+    ...(sortable
+      ? []
+      : [...customFields.values()].map((f) => ({
+          label: f.custom!.name,
+          insert: `"${f.custom!.name.replace(/"/g, '\\"')}"`,
+          detail: f.description,
+          kind: "field" as const,
+        }))),
+  ];
+  const conditions = (): TqlSuggestion[] => [
+    ...BUILTIN_CONDITION_FUNCTIONS.map((f) => ({
+      label: `${f.name}("…")`,
+      insert: `${f.name}("`,
+      detail: f.description,
+      kind: "function" as const,
+    })),
+    ...(catalog.functions ?? [])
+      .filter((f) => f.kind === "condition")
+      .map((f) => ({
+        label: `${f.name}()`,
+        insert: `${f.name}()`,
+        detail: f.description || "Custom condition",
+        kind: "function" as const,
+      })),
+  ];
   const kw = (...words: string[]) =>
     words.map((w) => ({ label: w, insert: w, kind: "keyword" as const }));
 
@@ -136,22 +193,31 @@ export function suggestTql(input: string, cursor: number, catalog: TqlCatalog): 
     return result([{ label: ",", insert: ",", kind: "keyword" }]);
   }
 
+  // Inside filter("…"): saved filter names.
+  if (
+    last?.type === "lparen" &&
+    prev &&
+    BUILTIN_CONDITION_FUNCTIONS.some((f) => f.name === lower(prev))
+  ) {
+    return result((catalog.savedFilters ?? []).map(savedFilterValue));
+  }
+
   // Start of a condition.
   if (!last || last.type === "lparen" || ["and", "or", "not"].includes(lower(last) ?? "")) {
     if (!last || last.type !== "lparen" || !prev || !isListOperator(prev, tokens.at(-3))) {
-      return result([...fields(), ...kw("NOT", "ORDER BY")]);
+      return result([...fields(), ...conditions(), ...kw("NOT", "ORDER BY")]);
     }
   }
 
   // Inside an IN (…) list: find the clause's field.
-  const listField = currentListField(tokens);
+  const listField = currentListField(tokens, resolve);
   if (listField) return result(valueSuggestions(listField, catalog));
 
   // Right after a field name: operators.
   if (last?.type === "word" || last?.type === "string") {
-    const field = findField(last.value);
+    const field = resolve(last.value);
     const isValue = prev && (prev.type === "op" || ["in"].includes(lower(prev) ?? ""));
-    if (field && !isValue && !(prev?.type === "word" && findField(prev.value))) {
+    if (field && !isValue && !(prev?.type === "word" && resolve(prev.value))) {
       return result(
         field.operators.map((op) => ({
           label: OPERATOR_LABEL[op] ?? op,
@@ -164,7 +230,7 @@ export function suggestTql(input: string, cursor: number, catalog: TqlCatalog): 
 
   // Right after an operator: values.
   if (last?.type === "op" && prev) {
-    const field = findField(prev.value);
+    const field = resolve(prev.value);
     if (field) return result(valueSuggestions(field, catalog));
   }
 
@@ -189,7 +255,10 @@ function isListOperator(t: Token, before?: Token) {
 }
 
 /** If the cursor is inside "field IN (a, b, |", returns that field. */
-function currentListField(tokens: Token[]): FieldDef | undefined {
+function currentListField(
+  tokens: Token[],
+  resolve: (name: string) => FieldDef | undefined,
+): FieldDef | undefined {
   let depth = 0;
   for (let i = tokens.length - 1; i >= 0; i--) {
     const t = tokens[i]!;
@@ -203,7 +272,7 @@ function currentListField(tokens: Token[]): FieldDef | undefined {
       if (op?.value.toLowerCase() !== "in") return undefined;
       const fieldToken =
         tokens[i - 2]?.value.toLowerCase() === "not" ? tokens[i - 3] : tokens[i - 2];
-      return fieldToken ? findField(fieldToken.value) : undefined;
+      return fieldToken ? resolve(fieldToken.value) : undefined;
     }
   }
   return undefined;
