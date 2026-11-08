@@ -319,6 +319,7 @@ async function seedDemoProject(workspaceId: string, demoUserId: string) {
     ],
   });
   await seedSprints(project.id, ids, dateIn);
+  await seedPhase5(workspaceId, project.id, ids, demoUserId, priya.id);
 
   await db.comment.createMany({
     data: [
@@ -333,6 +334,148 @@ async function seedDemoProject(workspaceId: string, demoUserId: string) {
         body: "Good catch — the cookie is `SameSite=Strict`. Switching it to `Lax` in the fix.",
       },
     ],
+  });
+}
+
+/**
+ * Workflow approval, custom fields and TQL functions for the demo project:
+ * In Review → Done needs an admin's approval (one request is already waiting), issues carry a
+ * Team and a "Customer facing" flag, and the workspace has isStale(), atRisk() and webCore().
+ */
+async function seedPhase5(
+  workspaceId: string,
+  projectId: string,
+  ids: string[],
+  demoUserId: string,
+  priyaId: string,
+) {
+  const statuses = await db.workflowStatus.findMany({ where: { projectId } });
+  const byName = (name: string) => statuses.find((s) => s.name === name)!;
+  await db.workflowTransition.create({
+    data: {
+      projectId,
+      fromStatusId: byName("In Review").id,
+      toStatusId: byName("Done").id,
+      requiresApproval: true,
+      approverRole: "admin",
+    },
+  });
+  const inReview = await db.issue.findFirst({
+    where: { projectId, statusId: byName("In Review").id },
+    orderBy: { number: "asc" },
+    select: { id: true },
+  });
+  if (inReview) {
+    await db.approvalRequest.create({
+      data: {
+        issueId: inReview.id,
+        fromStatusId: byName("In Review").id,
+        toStatusId: byName("Done").id,
+        approverRole: "admin",
+        requestedById: priyaId,
+      },
+    });
+    await db.issueActivity.create({
+      data: {
+        issueId: inReview.id,
+        actorId: priyaId,
+        action: "approval_requested",
+        field: "status",
+        fromValue: "In Review",
+        toValue: "Done",
+      },
+    });
+  }
+
+  const team = await db.customField.create({
+    data: {
+      projectId,
+      name: "Team",
+      description: "Who owns the work",
+      type: "select",
+      position: 0,
+      options: {
+        create: [
+          { value: "Platform", color: "blue", position: 0 },
+          { value: "Growth", color: "green", position: 1 },
+          { value: "Design", color: "violet", position: 2 },
+        ],
+      },
+    },
+    include: { options: true },
+  });
+  const customerFacing = await db.customField.create({
+    data: { projectId, name: "Customer facing", type: "checkbox", position: 1 },
+  });
+  await db.customField.create({
+    data: {
+      projectId,
+      name: "Release",
+      description: "Target release, e.g. 2026.12",
+      type: "text",
+      position: 2,
+    },
+  });
+  const option = (value: string) => team.options.find((o) => o.value === value)!.id;
+  const teams: [number, string][] = [
+    [2, "Growth"],
+    [3, "Growth"],
+    [4, "Platform"],
+    [6, "Platform"],
+    [9, "Design"],
+  ];
+  await db.issueFieldValue.createMany({
+    data: [
+      ...teams
+        .filter(([n]) => ids[n - 1])
+        .map(([n, value]) => ({
+          issueId: ids[n - 1]!,
+          fieldId: team.id,
+          optionIds: [option(value)],
+        })),
+      ...[2, 4]
+        .filter((n) => ids[n - 1])
+        .map((n) => ({ issueId: ids[n - 1]!, fieldId: customerFacing.id, boolValue: true })),
+    ],
+  });
+
+  const functions = [
+    {
+      name: "isStale",
+      kind: "condition" as const,
+      description: "Open and not updated in two weeks",
+      body: "statusCategory != done AND updated < -14d",
+    },
+    {
+      name: "atRisk",
+      kind: "condition" as const,
+      description: "High-priority work due within a week",
+      body: "statusCategory != done AND priority >= high AND due <= 7d",
+    },
+    {
+      name: "webCore",
+      kind: "values" as const,
+      description: "The core Web Platform team",
+      valueKind: "user",
+      values: [DEMO_USER.email, "priya@tracklane.dev"],
+    },
+  ];
+  for (const fn of functions) {
+    await db.tqlFunction.upsert({
+      where: { workspaceId_name: { workspaceId, name: fn.name } },
+      update: {},
+      create: { ...fn, workspaceId, createdById: demoUserId },
+    });
+  }
+  await db.savedFilter.create({
+    data: {
+      workspaceId,
+      ownerId: demoUserId,
+      name: "Customer-facing work",
+      description: "Open issues customers will notice",
+      query: '"Customer facing" = true AND statusCategory != done ORDER BY priority DESC',
+      shared: true,
+    },
   });
 }
 

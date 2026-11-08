@@ -36,20 +36,24 @@ model User {
   /// Workspace opened most recently; "/" redirects there.
   lastWorkspaceId String? @map("last_workspace_id")
 
-  sessions          Session[]
-  accounts          Account[]
-  memberships       WorkspaceMember[]
-  invitationsSent   WorkspaceInvitation[] @relation("InvitedBy")
-  workspacesCreated Workspace[]           @relation("WorkspaceCreatedBy")
-  projectsLed       Project[]             @relation("ProjectLead")
-  projectsCreated   Project[]             @relation("ProjectCreatedBy")
-  issuesAssigned    Issue[]               @relation("IssueAssignee")
-  issuesReported    Issue[]               @relation("IssueReporter")
-  comments          Comment[]
-  attachments       Attachment[]
-  issueActivities   IssueActivity[]
-  savedFilters      SavedFilter[]
-  filterFavorites   FilterFavorite[]
+  sessions           Session[]
+  accounts           Account[]
+  memberships        WorkspaceMember[]
+  invitationsSent    WorkspaceInvitation[] @relation("InvitedBy")
+  workspacesCreated  Workspace[]           @relation("WorkspaceCreatedBy")
+  projectsLed        Project[]             @relation("ProjectLead")
+  projectsCreated    Project[]             @relation("ProjectCreatedBy")
+  issuesAssigned     Issue[]               @relation("IssueAssignee")
+  issuesReported     Issue[]               @relation("IssueReporter")
+  comments           Comment[]
+  attachments        Attachment[]
+  issueActivities    IssueActivity[]
+  savedFilters       SavedFilter[]
+  filterFavorites    FilterFavorite[]
+  approvalsRequested ApprovalRequest[]     @relation("ApprovalRequester")
+  approvalsDecided   ApprovalRequest[]     @relation("ApprovalDecider")
+  fieldValues        IssueFieldValue[]
+  tqlFunctions       TqlFunction[]
 
   @@map("users")
 }
@@ -132,6 +136,7 @@ model Workspace {
   projects     Project[]
   issues       Issue[]
   savedFilters SavedFilter[]
+  tqlFunctions TqlFunction[]
 
   @@map("workspaces")
 }
@@ -210,30 +215,37 @@ enum Priority {
 }
 
 model Project {
-  id            String      @id @default(cuid())
-  workspaceId   String      @map("workspace_id")
+  id                  String      @id @default(cuid())
+  workspaceId         String      @map("workspace_id")
   /// Prefix of issue keys (PAY → PAY-12). Unique per workspace, fixed after creation.
-  key           String
-  name          String
-  description   String      @default("")
-  type          ProjectType @default(scrum)
-  leadId        String?     @map("lead_id")
+  key                 String
+  name                String
+  description         String      @default("")
+  type                ProjectType @default(scrum)
+  leadId              String?     @map("lead_id")
   /// Last issue number handed out; incremented atomically when an issue is created.
-  issueCounter  Int         @default(0) @map("issue_counter")
+  issueCounter        Int         @default(0) @map("issue_counter")
   /// Last sprint number handed out ("WEB Sprint 4").
-  sprintCounter Int         @default(0) @map("sprint_counter")
-  createdById   String?     @map("created_by_id")
-  archivedAt    DateTime?   @map("archived_at")
-  createdAt     DateTime    @default(now()) @map("created_at")
-  updatedAt     DateTime    @updatedAt @map("updated_at")
+  sprintCounter       Int         @default(0) @map("sprint_counter")
+  /// When true, only transitions listed in workflow_transitions are allowed; otherwise any → any.
+  restrictTransitions Boolean     @default(false) @map("restrict_transitions")
+  /// Kanban only: issues in this status live in the Backlog tab instead of on the board.
+  backlogStatusId     String?     @unique @map("backlog_status_id")
+  createdById         String?     @map("created_by_id")
+  archivedAt          DateTime?   @map("archived_at")
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
 
-  workspace Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  lead      User?            @relation("ProjectLead", fields: [leadId], references: [id], onDelete: SetNull)
-  createdBy User?            @relation("ProjectCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  statuses  WorkflowStatus[]
-  issues    Issue[]
-  labels    Label[]
-  sprints   Sprint[]
+  workspace     Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  lead          User?                @relation("ProjectLead", fields: [leadId], references: [id], onDelete: SetNull)
+  createdBy     User?                @relation("ProjectCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  statuses      WorkflowStatus[]
+  issues        Issue[]
+  labels        Label[]
+  sprints       Sprint[]
+  transitions   WorkflowTransition[]
+  customFields  CustomField[]
+  backlogStatus WorkflowStatus?      @relation("ProjectBacklogStatus", fields: [backlogStatusId], references: [id], onDelete: SetNull)
 
   @@unique([workspaceId, key])
   @@map("projects")
@@ -248,8 +260,13 @@ model WorkflowStatus {
   position  Int
   createdAt DateTime       @default(now()) @map("created_at")
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  issues  Issue[]
+  project         Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  issues          Issue[]
+  transitionsFrom WorkflowTransition[] @relation("TransitionFrom")
+  transitionsTo   WorkflowTransition[] @relation("TransitionTo")
+  backlogOf       Project?             @relation("ProjectBacklogStatus")
+  approvalsFrom   ApprovalRequest[]    @relation("ApprovalFrom")
+  approvalsTo     ApprovalRequest[]    @relation("ApprovalTo")
 
   @@unique([projectId, name])
   @@map("workflow_statuses")
@@ -285,18 +302,20 @@ model Issue {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  project     Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  status      WorkflowStatus  @relation(fields: [statusId], references: [id], onDelete: Restrict)
-  assignee    User?           @relation("IssueAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
-  reporter    User?           @relation("IssueReporter", fields: [reporterId], references: [id], onDelete: SetNull)
-  parent      Issue?          @relation("IssueParent", fields: [parentId], references: [id], onDelete: SetNull)
-  sprint      Sprint?         @relation(fields: [sprintId], references: [id], onDelete: SetNull)
-  children    Issue[]         @relation("IssueParent")
+  workspace   Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project     Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  status      WorkflowStatus    @relation(fields: [statusId], references: [id], onDelete: Restrict)
+  assignee    User?             @relation("IssueAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  reporter    User?             @relation("IssueReporter", fields: [reporterId], references: [id], onDelete: SetNull)
+  parent      Issue?            @relation("IssueParent", fields: [parentId], references: [id], onDelete: SetNull)
+  sprint      Sprint?           @relation(fields: [sprintId], references: [id], onDelete: SetNull)
+  children    Issue[]           @relation("IssueParent")
   labels      IssueLabel[]
   comments    Comment[]
   attachments Attachment[]
   activities  IssueActivity[]
+  approvals   ApprovalRequest[]
+  fieldValues IssueFieldValue[]
 
   @@unique([projectId, number])
   @@index([workspaceId, assigneeId])
@@ -461,4 +480,161 @@ model FilterFavorite {
   @@id([filterId, userId])
   @@index([userId])
   @@map("filter_favorites")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Workflow and approvals
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// An allowed move between two statuses, optionally needing approval.
+model WorkflowTransition {
+  id               String        @id @default(cuid())
+  projectId        String        @map("project_id")
+  fromStatusId     String        @map("from_status_id")
+  toStatusId       String        @map("to_status_id")
+  requiresApproval Boolean       @default(false) @map("requires_approval")
+  /// Lowest role that can approve (owner ⊃ admin ⊃ member).
+  approverRole     WorkspaceRole @default(admin) @map("approver_role")
+  createdAt        DateTime      @default(now()) @map("created_at")
+
+  project Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  from    WorkflowStatus @relation("TransitionFrom", fields: [fromStatusId], references: [id], onDelete: Cascade)
+  to      WorkflowStatus @relation("TransitionTo", fields: [toStatusId], references: [id], onDelete: Cascade)
+
+  @@unique([fromStatusId, toStatusId])
+  @@index([projectId])
+  @@map("workflow_transitions")
+}
+
+enum ApprovalState {
+  pending
+  approved
+  rejected
+  cancelled
+}
+
+model ApprovalRequest {
+  id            String        @id @default(cuid())
+  issueId       String        @map("issue_id")
+  fromStatusId  String        @map("from_status_id")
+  toStatusId    String        @map("to_status_id")
+  approverRole  WorkspaceRole @map("approver_role")
+  state         ApprovalState @default(pending)
+  requestedById String?       @map("requested_by_id")
+  decidedById   String?       @map("decided_by_id")
+  decidedAt     DateTime?     @map("decided_at")
+  note          String        @default("")
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  issue       Issue          @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  from        WorkflowStatus @relation("ApprovalFrom", fields: [fromStatusId], references: [id], onDelete: Cascade)
+  to          WorkflowStatus @relation("ApprovalTo", fields: [toStatusId], references: [id], onDelete: Cascade)
+  requestedBy User?          @relation("ApprovalRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+  decidedBy   User?          @relation("ApprovalDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@index([issueId, state])
+  @@index([state])
+  @@map("approval_requests")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Custom fields
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum CustomFieldType {
+  text
+  number
+  date
+  select
+  multiselect
+  user
+  checkbox
+  url
+}
+
+model CustomField {
+  id          String          @id @default(cuid())
+  projectId   String          @map("project_id")
+  name        String
+  description String          @default("")
+  type        CustomFieldType
+  required    Boolean         @default(false)
+  position    Int             @default(0)
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  project Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  options CustomFieldOption[]
+  values  IssueFieldValue[]
+
+  @@unique([projectId, name])
+  @@map("custom_fields")
+}
+
+model CustomFieldOption {
+  id       String @id @default(cuid())
+  fieldId  String @map("field_id")
+  value    String
+  color    String @default("gray")
+  position Int    @default(0)
+
+  field CustomField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@unique([fieldId, value])
+  @@map("custom_field_options")
+}
+
+/// One custom field's value on one issue. Exactly one typed column is used per field type.
+model IssueFieldValue {
+  issueId     String    @map("issue_id")
+  fieldId     String    @map("field_id")
+  textValue   String?   @map("text_value")
+  numberValue Float?    @map("number_value")
+  dateValue   DateTime? @map("date_value") @db.Date
+  boolValue   Boolean?  @map("bool_value")
+  userId      String?   @map("user_id")
+  /// Selected option ids (one for select, any number for multiselect).
+  optionIds   String[]  @default([]) @map("option_ids")
+
+  issue Issue       @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  field CustomField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  user  User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@id([issueId, fieldId])
+  @@index([fieldId])
+  @@map("issue_field_values")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Custom TQL functions
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum TqlFunctionKind {
+  /// Expands to a TQL condition: isStale() → updated < -14d AND statusCategory != done
+  condition
+  /// Expands to a list of values for one field kind: frontendTeam() → priya@…, demo@…
+  values
+}
+
+model TqlFunction {
+  id          String          @id @default(cuid())
+  workspaceId String          @map("workspace_id")
+  /// Called as name(); letters, digits and underscores, starting with a letter.
+  name        String
+  description String          @default("")
+  kind        TqlFunctionKind
+  /// TQL condition (kind = condition).
+  body        String          @default("")
+  /// Field kind the values are for (kind = values): user, label, project, status, sprint, enum…
+  valueKind   String?         @map("value_kind")
+  values      String[]        @default([])
+  createdById String?         @map("created_by_id")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([workspaceId, name])
+  @@map("tql_functions")
 }
