@@ -97,6 +97,26 @@ Repository / Prisma (packages/db)
 - Next keeps visited routes mounted but hidden. Dialogs whose action redirects must close
   themselves (`useAction(..., { onNavigation })`), or they reappear when the user navigates back.
 
+## Boards, backlog and sprints
+
+- **Rank.** `issues.position` is one project-wide order shared by the board and the backlog.
+  A drop places the issue between its new neighbours (`rankBetween` in `@tracklane/core`);
+  when two neighbours get too close the project is renumbered in the same transaction.
+- **Moves.** Drag and drop calls `moveIssueAction`, which changes status and/or sprint and rank
+  together and records history. The board and backlog apply the move immediately with
+  `useOptimistic` and roll back with an error toast if the server refuses.
+- **Sprints.** `planned → active → completed`, at most one active per project. Starting snapshots
+  committed points; completing records done/open counts and points (for velocity, Phase 7) and
+  moves open issues to the backlog or a planned sprint. Kanban projects have no sprints; their
+  board shows open work plus anything finished in the last 14 days.
+- **Quick view.** `projects/[projectKey]/@quickview/(..)(..)issues/[issueKey]` intercepts issue
+  links clicked on project pages and renders the shared `IssueView` in a Sheet. A full load of
+  the same URL renders the normal issue page. `@quickview/[...catchAll]` and `default.tsx`
+  return `null` so the sheet closes when navigating to other project tabs.
+- Components that disappear after their own action (e.g. completing a sprint removes its
+  section) must show their toast after `await executeAsync(...)`, not in `onSuccess`, which
+  never runs once the component has unmounted.
+
 ## Next.js 16 specifics
 
 - **Cache Components** is on: data is dynamic by default. Anything that reads the request
