@@ -82,6 +82,10 @@ model User {
   webhooksCreated     Webhook[]
   incidentsCreated    Incident[]
   incidentUpdates     IncidentUpdate[]
+  timeOff             TimeOff[]
+  timesheets          TimesheetSubmission[]    @relation("TimesheetOwner")
+  timesheetsReviewed  TimesheetSubmission[]    @relation("TimesheetReviewer")
+  activeTimer         ActiveTimer?
 
   @@map("users")
 }
@@ -179,6 +183,8 @@ model Workspace {
   webhooks         Webhook[]
   statusComponents StatusComponent[]
   incidents        Incident[]
+  timeOff          TimeOff[]
+  timesheets       TimesheetSubmission[]
 
   @@map("workspaces")
 }
@@ -374,6 +380,7 @@ model Issue {
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
   components     IssueComponent[]
+  timers         ActiveTimer[]
   workspace      Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   resolution     Resolution?       @relation(fields: [resolutionId], references: [id], onDelete: SetNull)
   watchers       IssueWatcher[]
@@ -991,6 +998,8 @@ model Worklog {
   /// The day the work was done.
   date      DateTime @db.Date
   note      String   @default("")
+  /// Billable to a client (timesheets split billable vs internal).
+  billable  Boolean  @default(true)
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -1084,11 +1093,85 @@ model Release {
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  issues  Issue[]
+  project   Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  issues    Issue[]
+  checklist ReleaseChecklistItem[]
 
   @@unique([projectId, name])
   @@map("releases")
+}
+
+/// A readiness step for a release (QA sign-off, docs, rollback plan…).
+model ReleaseChecklistItem {
+  id        String   @id @default(cuid())
+  releaseId String   @map("release_id")
+  text      String
+  done      Boolean  @default(false)
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  release Release @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+
+  @@index([releaseId, position])
+  @@map("release_checklist_items")
+}
+
+/// Days a person is away (holiday, sick, conference). Workload and capacity skip them.
+model TimeOff {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  userId      String   @map("user_id")
+  startDate   DateTime @map("start_date") @db.Date
+  endDate     DateTime @map("end_date") @db.Date
+  note        String   @default("")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, startDate])
+  @@map("time_off")
+}
+
+enum TimesheetStatus {
+  submitted
+  approved
+  rejected
+}
+
+/// A person's week of logged time sent to an admin for approval.
+model TimesheetSubmission {
+  id          String          @id @default(cuid())
+  workspaceId String          @map("workspace_id")
+  userId      String          @map("user_id")
+  /// Monday of the week.
+  weekStart   DateTime        @map("week_start") @db.Date
+  minutes     Int
+  status      TimesheetStatus @default(submitted)
+  reviewerId  String?         @map("reviewer_id")
+  note        String          @default("")
+  submittedAt DateTime        @default(now()) @map("submitted_at")
+  decidedAt   DateTime?       @map("decided_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation("TimesheetOwner", fields: [userId], references: [id], onDelete: Cascade)
+  reviewer  User?     @relation("TimesheetReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+
+  @@unique([workspaceId, userId, weekStart])
+  @@index([workspaceId, status])
+  @@map("timesheet_submissions")
+}
+
+/// A running stopwatch on an issue (one per person).
+model ActiveTimer {
+  userId    String   @id @map("user_id")
+  issueId   String   @map("issue_id")
+  startedAt DateTime @default(now()) @map("started_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  issue Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+  @@map("active_timers")
 }
 
 enum GoalStatus {
