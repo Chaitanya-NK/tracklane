@@ -7,9 +7,11 @@ import { HeadingSkeleton } from "@/components/shared/skeletons";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  AutoRefresh,
   DashboardToolbar,
   type EditorContext,
   SharedBadge,
+  SortableWidgetGrid,
   WidgetMenu,
 } from "@/features/dashboards";
 import { getDashboard, WidgetBody } from "@/features/dashboards/server";
@@ -42,6 +44,24 @@ async function DashboardView({ params, searchParams }: Props) {
     ? { slug, dashboardId: dashboard.id, widgets: dashboard.widgets, catalog: catalog!, projects }
     : null;
 
+  const card = (widget: (typeof dashboard.widgets)[number], index: number) => (
+    <Card key={widget.id} className={cn("h-full", widget.size === "full" && "lg:col-span-2")}>
+      <CardHeader className={cn(ctx && "pl-8")}>
+        <CardTitle className="text-base">{widget.title}</CardTitle>
+        {ctx ? (
+          <CardAction>
+            <WidgetMenu ctx={ctx} index={index} />
+          </CardAction>
+        ) : null}
+      </CardHeader>
+      <CardContent>
+        <Suspense fallback={<Skeleton className="h-40 w-full" />}>
+          <WidgetBody widget={widget} slug={slug} workspaceId={workspace.id} userId={user.id} />
+        </Suspense>
+      </CardContent>
+    </Card>
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -53,25 +73,28 @@ async function DashboardView({ params, searchParams }: Props) {
             <p className="text-sm text-muted-foreground">{dashboard.description}</p>
           ) : null}
         </div>
-        {dashboard.canEdit ? (
-          <DashboardToolbar
-            ctx={
-              ctx ?? {
-                slug,
-                dashboardId: dashboard.id,
-                widgets: dashboard.widgets,
-                catalog: { projects: [], statuses: [], users: [], labels: [], sprints: [] },
-                projects: [],
+        <div className="flex flex-wrap items-center gap-2">
+          {!editing ? <AutoRefresh dashboardId={dashboard.id} /> : null}
+          {dashboard.canEdit ? (
+            <DashboardToolbar
+              ctx={
+                ctx ?? {
+                  slug,
+                  dashboardId: dashboard.id,
+                  widgets: dashboard.widgets,
+                  catalog: { projects: [], statuses: [], users: [], labels: [], sprints: [] },
+                  projects: [],
+                }
               }
-            }
-            editing={editing}
-            meta={{
-              name: dashboard.name,
-              description: dashboard.description,
-              shared: dashboard.shared,
-            }}
-          />
-        ) : null}
+              editing={editing}
+              meta={{
+                name: dashboard.name,
+                description: dashboard.description,
+                shared: dashboard.shared,
+              }}
+            />
+          ) : null}
+        </div>
       </div>
       {dashboard.widgets.length === 0 ? (
         <EmptyState
@@ -83,30 +106,19 @@ async function DashboardView({ params, searchParams }: Props) {
               : "Its owner hasn't added widgets yet."
           }
         />
+      ) : ctx ? (
+        <SortableWidgetGrid
+          key={dashboard.widgets.map((w) => w.id).join(",")}
+          slug={slug}
+          dashboardId={dashboard.id}
+          widgets={dashboard.widgets}
+          nodes={Object.fromEntries(
+            dashboard.widgets.map((widget, index) => [widget.id, card(widget, index)]),
+          )}
+        />
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
-          {dashboard.widgets.map((widget, index) => (
-            <Card key={widget.id} className={cn(widget.size === "full" && "lg:col-span-2")}>
-              <CardHeader>
-                <CardTitle className="text-base">{widget.title}</CardTitle>
-                {ctx ? (
-                  <CardAction>
-                    <WidgetMenu ctx={ctx} index={index} />
-                  </CardAction>
-                ) : null}
-              </CardHeader>
-              <CardContent>
-                <Suspense fallback={<Skeleton className="h-40 w-full" />}>
-                  <WidgetBody
-                    widget={widget}
-                    slug={slug}
-                    workspaceId={workspace.id}
-                    userId={user.id}
-                  />
-                </Suspense>
-              </CardContent>
-            </Card>
-          ))}
+          {dashboard.widgets.map((widget, index) => card(widget, index))}
         </div>
       )}
     </div>

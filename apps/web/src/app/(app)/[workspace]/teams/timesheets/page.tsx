@@ -16,7 +16,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getTimesheet, weekStart } from "@/features/time/server";
+import { PendingTimesheets, TimerCard, TimesheetEditor } from "@/features/time";
+import {
+  getSubmission,
+  getTimer,
+  getTimesheet,
+  listPendingTimesheets,
+  weekStart,
+} from "@/features/time/server";
+import { can } from "@tracklane/core";
 import { getWorkspaceAccess } from "@/server/authz";
 
 export const metadata: Metadata = { title: "Timesheets" };
@@ -29,7 +37,7 @@ const fmt = (m: number) => (m ? formatDuration(m) : "");
 
 async function Timesheet({ params, searchParams }: Props) {
   const [{ workspace: slug }, sp] = await Promise.all([params, searchParams]);
-  const { workspace, user } = await getWorkspaceAccess(slug);
+  const { workspace, user, role } = await getWorkspaceAccess(slug);
   const requested =
     typeof sp.week === "string" && /^\d{4}-\d{2}-\d{2}$/.test(sp.week)
       ? new Date(`${sp.week}T00:00:00Z`)
@@ -45,6 +53,23 @@ async function Timesheet({ params, searchParams }: Props) {
   const totals = days.map((_, i) => rows.reduce((s, r) => s + (r.days[i] ?? 0), 0));
   const link = (week: Date, who = mine ? "me" : "all") =>
     `/${slug}/teams/timesheets?week=${iso(week)}${who === "all" ? "&who=all" : ""}` as Route;
+  const isAdmin = can(role, "members:update_role");
+  const [submission, timer, pending] = await Promise.all([
+    getSubmission(workspace.id, user.id, start),
+    getTimer(user.id),
+    isAdmin ? listPendingTimesheets(workspace.id) : Promise.resolve([]),
+  ]);
+  const side = (
+    <aside className="w-full space-y-4 xl:w-80">
+      <TimerCard slug={slug} timer={timer} />
+      {isAdmin ? (
+        <PendingTimesheets
+          slug={slug}
+          items={pending.map((p) => ({ ...p, weekStart: iso(p.weekStart) }))}
+        />
+      ) : null}
+    </aside>
+  );
 
   return (
     <div className="space-y-3">
@@ -82,7 +107,27 @@ async function Timesheet({ params, searchParams }: Props) {
           </Button>
         </div>
       </div>
-      {rows.length === 0 ? (
+      {mine ? (
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
+          <div className="min-w-0 flex-1">
+            <TimesheetEditor
+              key={iso(start)}
+              slug={slug}
+              week={iso(start)}
+              rows={rows.map((r) => ({
+                issue: { id: r.issue.id, key: r.issue.key, title: r.issue.title },
+                days: r.days,
+                total: r.total,
+                billableMinutes: r.billableMinutes,
+              }))}
+              status={submission?.status ?? "draft"}
+              reviewNote={submission?.note || null}
+              today={iso(new Date())}
+            />
+          </div>
+          {side}
+        </div>
+      ) : rows.length === 0 ? (
         <EmptyState
           icon={ClockIcon}
           title="No time logged this week"

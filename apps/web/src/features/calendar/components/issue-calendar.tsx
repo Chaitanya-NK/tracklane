@@ -26,8 +26,16 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { IssueTypeIcon, PriorityIcon } from "@/features/issues";
 import { updateIssueAction } from "@/features/issues/server/actions";
 import { cn } from "@/lib/utils";
-import { monthGrid, monthLabel, shiftMonth } from "../month";
-import type { CalendarIssue } from "../types";
+import {
+  monthGrid,
+  monthLabel,
+  mondayOf,
+  shiftMonth,
+  shiftWeek,
+  weekGrid,
+  weekLabel,
+} from "../month";
+import type { CalendarIssue, CalendarSprint } from "../types";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MAX_PER_DAY = 3;
@@ -102,6 +110,8 @@ function DayCell({
   inMonth,
   isToday,
   canEdit,
+  sprint,
+  tall,
 }: {
   day: string;
   issues: CalendarIssue[];
@@ -109,9 +119,12 @@ function DayCell({
   inMonth: boolean;
   isToday: boolean;
   canEdit: boolean;
+  sprint: CalendarSprint | null;
+  tall?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: day });
-  const visible = issues.slice(0, MAX_PER_DAY);
+  const visible = tall ? issues : issues.slice(0, MAX_PER_DAY);
+  const isMonday = new Date(`${day}T00:00:00Z`).getUTCDay() === 1;
   const hidden = issues.length - visible.length;
   return (
     <div
@@ -119,10 +132,26 @@ function DayCell({
       aria-label={dayLabel(day)}
       className={cn(
         "flex min-h-28 flex-col gap-1 border-r border-b p-1.5 [&:nth-child(7n)]:border-r-0",
+        tall && "min-h-96",
         !inMonth && "bg-muted/40",
         isOver && "bg-primary/10",
       )}
     >
+      {sprint ? (
+        <span
+          title={sprint.name}
+          className={cn(
+            "-mx-1.5 -mt-1.5 mb-0.5 h-4 truncate px-1.5 text-[10px] leading-4 font-medium",
+            sprint.state === "active"
+              ? "bg-primary/15 text-primary"
+              : "bg-muted text-muted-foreground",
+            day === sprint.start && "ml-0 rounded-l",
+            day === sprint.end && "mr-0 rounded-r",
+          )}
+        >
+          {day === sprint.start || isMonday ? sprint.name : "\u00a0"}
+        </span>
+      ) : null}
       <span
         className={cn(
           "self-end rounded-full px-1.5 text-xs tabular-nums",
@@ -200,6 +229,9 @@ export function IssueCalendar({
   scheduled,
   unscheduled,
   canEdit,
+  sprints = [],
+  view = "month",
+  week,
 }: {
   slug: string;
   month: string;
@@ -207,6 +239,10 @@ export function IssueCalendar({
   scheduled: CalendarIssue[];
   unscheduled: CalendarIssue[];
   canEdit: boolean;
+  sprints?: CalendarSprint[];
+  view?: "month" | "week";
+  /** Monday of the week shown in week view. */
+  week?: string;
 }) {
   const pathname = usePathname();
   const all = useMemo(() => [...scheduled, ...unscheduled], [scheduled, unscheduled]);
@@ -219,7 +255,9 @@ export function IssueCalendar({
   const [, startTransition] = useTransition();
   const update = useAction(updateIssueAction);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
-  const days = monthGrid(month);
+  const monday = week ?? mondayOf(today);
+  const days = view === "week" ? weekGrid(monday) : monthGrid(month);
+  const sprintOn = (day: string) => sprints.find((s) => s.start <= day && day <= s.end) ?? null;
 
   const byDay = useMemo(() => {
     const map = new Map<string, CalendarIssue[]>();
@@ -245,6 +283,10 @@ export function IssueCalendar({
 
   const active = activeId ? optimistic.find((i) => i.id === activeId) : undefined;
   const monthHref = (m: string) => `${pathname}?month=${m}` as Route;
+  const weekHref = (w: string) => `${pathname}?view=week&week=${w}` as Route;
+  const prev = view === "week" ? weekHref(shiftWeek(monday, -1)) : monthHref(shiftMonth(month, -1));
+  const next = view === "week" ? weekHref(shiftWeek(monday, 1)) : monthHref(shiftMonth(month, 1));
+  const todayHref = view === "week" ? weekHref(mondayOf(today)) : monthHref(today.slice(0, 7));
 
   return (
     <DndContext
@@ -256,18 +298,60 @@ export function IssueCalendar({
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
         <div className="min-w-0 flex-1 space-y-3">
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold">{monthLabel(month)}</h2>
+            <h2 className="text-lg font-semibold">
+              {view === "week" ? weekLabel(monday) : monthLabel(month)}
+            </h2>
             <div className="ml-auto flex items-center gap-1">
-              <Button asChild variant="outline" size="icon-sm" aria-label="Previous month">
-                <Link href={monthHref(shiftMonth(month, -1))}>
+              <div
+                className="mr-2 inline-flex rounded-md border p-0.5"
+                role="group"
+                aria-label="View"
+              >
+                <Link
+                  href={monthHref(monday.slice(0, 7))}
+                  aria-pressed={view === "month"}
+                  className={cn(
+                    "rounded px-2.5 py-0.5 text-sm",
+                    view === "month" ? "bg-secondary font-medium" : "text-muted-foreground",
+                  )}
+                >
+                  Month
+                </Link>
+                <Link
+                  href={weekHref(
+                    view === "week"
+                      ? monday
+                      : mondayOf(today.startsWith(month) ? today : `${month}-01`),
+                  )}
+                  aria-pressed={view === "week"}
+                  className={cn(
+                    "rounded px-2.5 py-0.5 text-sm",
+                    view === "week" ? "bg-secondary font-medium" : "text-muted-foreground",
+                  )}
+                >
+                  Week
+                </Link>
+              </div>
+              <Button
+                asChild
+                variant="outline"
+                size="icon-sm"
+                aria-label={view === "week" ? "Previous week" : "Previous month"}
+              >
+                <Link href={prev}>
                   <ChevronLeftIcon aria-hidden="true" />
                 </Link>
               </Button>
               <Button asChild variant="outline" size="sm">
-                <Link href={monthHref(today.slice(0, 7))}>Today</Link>
+                <Link href={todayHref}>Today</Link>
               </Button>
-              <Button asChild variant="outline" size="icon-sm" aria-label="Next month">
-                <Link href={monthHref(shiftMonth(month, 1))}>
+              <Button
+                asChild
+                variant="outline"
+                size="icon-sm"
+                aria-label={view === "week" ? "Next week" : "Next month"}
+              >
+                <Link href={next}>
                   <ChevronRightIcon aria-hidden="true" />
                 </Link>
               </Button>
@@ -288,9 +372,11 @@ export function IssueCalendar({
                   day={day}
                   slug={slug}
                   issues={byDay.get(day) ?? []}
-                  inMonth={day.startsWith(month)}
+                  inMonth={view === "week" || day.startsWith(month)}
                   isToday={day === today}
                   canEdit={canEdit}
+                  sprint={sprintOn(day)}
+                  tall={view === "week"}
                 />
               ))}
             </div>

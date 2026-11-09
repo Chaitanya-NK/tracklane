@@ -20,6 +20,9 @@ async function ProjectTimeline({ params }: { params: Props["params"] }) {
       epics={data.epics}
       loose={data.loose}
       sprints={data.sprints}
+      releases={data.releases}
+      links={data.links}
+      projectKey={project.key}
       today={new Date().toISOString().slice(0, 10)}
       canEdit={can(role, "issues:update")}
     />

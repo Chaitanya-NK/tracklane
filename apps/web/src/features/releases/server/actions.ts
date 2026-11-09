@@ -1,10 +1,11 @@
 "use server";
 
-import { dueDateSchema } from "@tracklane/core";
+import { AppError, can, dueDateSchema } from "@tracklane/core";
 import { refresh } from "next/cache";
 import { z } from "zod";
 import { getProjectAccess } from "@/server/authz";
 import { authActionClient } from "@/server/safe-action";
+import { addChecklistItems, setChecklistItem } from "./checklist";
 import { deleteRelease, saveRelease, setReleaseStatus, shipRelease } from "./service";
 
 const scope = { slug: z.string(), projectKey: z.string() };
@@ -77,3 +78,41 @@ export const deleteReleaseAction = authActionClient
     await deleteRelease(workspace.id, project.id, ctx.user.id, parsedInput.releaseId);
     refresh();
   });
+
+export const addChecklistItemsAction = authActionClient
+  .inputSchema(
+    z.object({
+      ...scope,
+      releaseId: z.string(),
+      texts: z.array(z.string().trim().min(1).max(200)).min(1).max(10),
+    }),
+  )
+  .action(async ({ parsedInput }) => {
+    const { project } = await editable(parsedInput.slug, parsedInput.projectKey);
+    await addChecklistItems(project.id, parsedInput.releaseId, parsedInput.texts);
+    refresh();
+  });
+
+export const setChecklistItemAction = authActionClient
+  .inputSchema(
+    z.object({
+      ...scope,
+      itemId: z.string(),
+      done: z.boolean().optional(),
+      remove: z.boolean().optional(),
+    }),
+  )
+  .action(async ({ parsedInput }) => {
+    const { project } = await editable(parsedInput.slug, parsedInput.projectKey);
+    await setChecklistItem(project.id, parsedInput.itemId, parsedInput);
+    refresh();
+  });
+
+/** Checklists follow release editing rights (project admins). */
+async function editable(slug: string, projectKey: string) {
+  const access = await getProjectAccess(slug, projectKey);
+  if (!can(access.role, "projects:update")) {
+    throw new AppError("forbidden", "Only project admins can change release checklists");
+  }
+  return access;
+}

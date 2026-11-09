@@ -6,8 +6,13 @@ import { Suspense } from "react";
 import { HeadingSkeleton, TableSkeleton } from "@/components/shared/skeletons";
 import { Button } from "@/components/ui/button";
 import { IssueTable } from "@/features/issues";
-import { ReleaseDetail } from "@/features/releases";
-import { getRelease, listReleases } from "@/features/releases/server";
+import { ReleaseChecklist, ReleaseDetail } from "@/features/releases";
+import {
+  DEFAULT_CHECKLIST,
+  getRelease,
+  listChecklist,
+  listReleases,
+} from "@/features/releases/server";
 import { getProjectAccess } from "@/server/authz";
 import { ArrowLeftIcon } from "lucide-react";
 
@@ -18,9 +23,10 @@ type Props = PageProps<"/[workspace]/projects/[projectKey]/releases/[releaseId]"
 async function Release({ params }: { params: Props["params"] }) {
   const { workspace: slug, projectKey, releaseId } = await params;
   const { project, role } = await getProjectAccess(slug, projectKey);
-  const [found, all] = await Promise.all([
+  const [found, all, checklist] = await Promise.all([
     getRelease(project.id, releaseId),
     listReleases(project.id, false),
+    listChecklist(releaseId),
   ]);
   if (!found) notFound();
   const counts = all.find((r) => r.id === releaseId)?.counts ?? {
@@ -43,6 +49,14 @@ async function Release({ params }: { params: Props["params"] }) {
         counts={counts}
         others={all.filter((r) => r.status === "unreleased" && r.id !== releaseId)}
         notes={found.notes}
+        canEdit={can(role, "projects:update")}
+      />
+      <ReleaseChecklist
+        slug={slug}
+        projectKey={project.key}
+        releaseId={found.release.id}
+        items={checklist}
+        defaults={DEFAULT_CHECKLIST}
         canEdit={can(role, "projects:update")}
       />
       <section className="space-y-3" aria-labelledby="release-issues">

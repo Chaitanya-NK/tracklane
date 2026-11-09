@@ -9,3 +9,10 @@ export interface CalendarIssue {
   status: { name: string; category: StatusCategory };
   due: string | null;
 }
+
+export interface CalendarSprint {
+  name: string;
+  start: string;
+  end: string;
+  state: "planned" | "active" | "completed";
+}

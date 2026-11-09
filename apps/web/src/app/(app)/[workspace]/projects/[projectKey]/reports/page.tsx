@@ -10,11 +10,16 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { DownloadIcon } from "lucide-react";
 import {
   BreakdownChart,
   BurndownChart,
   CreatedResolvedChart,
+  CycleTimeChart,
   FlowChart,
+  forecastFinish,
+  SprintReportView,
   SlaReport,
   SprintPicker,
   VelocityChart,
@@ -24,7 +29,9 @@ import {
   getBreakdown,
   getBurndown,
   getCreatedResolved,
+  getCycleTime,
   getFlow,
+  getSprintReport,
   getVelocity,
   getWorkload,
 } from "@/features/reports/server";
@@ -74,15 +81,26 @@ async function Reports({ params, searchParams }: Props) {
   const sprintParam = typeof sp.sprint === "string" ? sp.sprint : undefined;
   const scrum = project.type === "scrum";
   const since = daysAgo(30);
-  const [burn, velocity, flow, createdResolved, byPriority, slas, workload] = await Promise.all([
-    scrum ? getBurndown(project.id, sprintParam) : Promise.resolve(null),
-    scrum ? getVelocity(project.id) : Promise.resolve([]),
-    getFlow(project.id, 30),
-    getCreatedResolved({ projectId: project.id }, 30),
-    getBreakdown({ projectId: project.id, status: { category: { not: "done" } } }, "priority"),
-    slaReport(project.id, workspace.id, since),
-    getWorkload(workspace.id, project.id, weekStart(new Date())),
-  ]);
+  const [burn, velocity, flow, createdResolved, byPriority, slas, workload, cycle] =
+    await Promise.all([
+      scrum ? getBurndown(project.id, sprintParam) : Promise.resolve(null),
+      scrum ? getVelocity(project.id) : Promise.resolve([]),
+      getFlow(project.id, 30),
+      getCreatedResolved({ projectId: project.id }, 30),
+      getBreakdown({ projectId: project.id, status: { category: { not: "done" } } }, "priority"),
+      slaReport(project.id, workspace.id, since),
+      getWorkload(workspace.id, project.id, weekStart(new Date())),
+      getCycleTime(project.id, 90),
+    ]);
+  const sprintReport = burn?.sprint ? await getSprintReport(project.id, burn.sprint.id) : null;
+  const unit = sp.unit === "issues" ? "issues" : "points";
+  const scopes = (burn?.points ?? []).map((p) => p.scope).filter((v): v is number => v !== null);
+  const remaining = (burn?.points ?? [])
+    .map((p) => p.remaining)
+    .filter((v): v is number => v !== null);
+  const today = new Date().toISOString().slice(0, 10);
+  const exportHref = (report: string, extra = "") =>
+    `/api/reports/export?workspace=${slug}&project=${project.key}&report=${report}${extra}`;
   const average = averageVelocity(velocity);
 
   return (
@@ -106,6 +124,45 @@ async function Reports({ params, searchParams }: Props) {
           ) : (
             <p className="text-sm text-muted-foreground">No sprint data yet.</p>
           )}
+        </ReportCard>
+      ) : null}
+      {sprintReport && burn?.sprint ? (
+        <ReportCard
+          title={`Sprint report · ${sprintReport.name}`}
+          description="What was committed, what got done, and what's left."
+          className="lg:col-span-2"
+          action={
+            <Button asChild variant="outline" size="sm">
+              <a href={exportHref("sprint", `&sprint=${burn.sprint.id}`)} download>
+                <DownloadIcon aria-hidden="true" /> Export
+              </a>
+            </Button>
+          }
+        >
+          <SprintReportView
+            slug={slug}
+            unit={unit}
+            unitHref={(u) =>
+              `/${slug}/projects/${project.key}/reports?${new URLSearchParams({
+                ...(sprintParam ? { sprint: sprintParam } : {}),
+                unit: u,
+              })}`
+            }
+            report={{
+              ...sprintReport,
+              scopeAdded: scopes.length ? Math.max(...scopes) - scopes[0]! : 0,
+              end: burn.sprint.end,
+              forecast:
+                sprintReport.state === "active" && scopes.length && remaining.length
+                  ? forecastFinish({
+                      start: burn.sprint.start,
+                      today,
+                      initialScope: scopes[0]!,
+                      remaining: remaining.at(-1)!,
+                    })
+                  : null,
+            }}
+          />
         </ReportCard>
       ) : null}
       {scrum ? (
@@ -135,6 +192,25 @@ async function Reports({ params, searchParams }: Props) {
         description="New and resolved issues per day, last 30 days."
       >
         <CreatedResolvedChart points={createdResolved} />
+      </ReportCard>
+      <ReportCard
+        title="Cycle time"
+        description={
+          cycle.stats.count
+            ? `From starting work to resolution, last 90 days (${cycle.stats.count} issues). Median ${cycle.stats.median} days · 85% within ${cycle.stats.p85} days.`
+            : "Resolve some issues to measure cycle time."
+        }
+        action={
+          cycle.stats.count ? (
+            <Button asChild variant="outline" size="sm">
+              <a href={exportHref("cycle")} download>
+                <DownloadIcon aria-hidden="true" /> Export
+              </a>
+            </Button>
+          ) : null
+        }
+      >
+        <CycleTimeChart buckets={cycle.stats.buckets} />
       </ReportCard>
       <ReportCard title="Open work by priority" description="Issues not done yet.">
         <BreakdownChart rows={byPriority} label="Priority" />

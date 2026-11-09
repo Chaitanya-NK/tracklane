@@ -1,2 +1,2 @@
-export { type IssueSla, slaReport, slasForIssue } from "./evaluate";
+export { type IssueSla, type SlaOverview, slaOverview, slaReport, slasForIssue } from "./evaluate";
 export { listSlaPolicies } from "./service";

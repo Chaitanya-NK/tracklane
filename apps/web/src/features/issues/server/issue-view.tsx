@@ -34,8 +34,8 @@ import { LiveRefresh, liveRooms, Viewers } from "@/components/shared/realtime";
 import { WatchButton } from "@/features/notifications";
 import { SlaChip } from "@/features/sla";
 import { slasForIssue } from "@/features/sla/server";
-import { TimeTracking, WorkLogList } from "@/features/time";
-import { getIssueTime } from "@/features/time/server";
+import { StartTimerButton, TimeTracking, WorkLogList } from "@/features/time";
+import { getIssueTime, getTimer } from "@/features/time/server";
 import { LinkedIssues } from "@/features/links";
 import { listLinks } from "@/features/links/server";
 import { getWatchState } from "@/features/notifications/server";
@@ -88,6 +88,7 @@ export async function IssueView({
     approval,
     watch,
     time,
+    timer,
     slas,
     links,
   ] = await Promise.all([
@@ -104,6 +105,7 @@ export async function IssueView({
     getPendingApproval(issue.id),
     getWatchState(issue.id, user.id),
     getIssueTime(issue.id),
+    getTimer(user.id),
     slasForIssue({
       id: issue.id,
       workspaceId: issue.workspaceId,
@@ -360,6 +362,15 @@ export async function IssueView({
                     logged={time.logged}
                     canEdit={canEdit}
                   />
+                  {canEdit ? (
+                    <div className="px-2 pt-1">
+                      <StartTimerButton
+                        slug={slug}
+                        issueId={issue.id}
+                        running={timer?.issue.id === issue.id}
+                      />
+                    </div>
+                  ) : null}
                 </section>
                 {slas.length ? (
                   <section aria-labelledby={`sla-${issue.id}`} className="space-y-1.5 px-2">

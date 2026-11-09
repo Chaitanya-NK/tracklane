@@ -21,3 +21,15 @@ export interface TimelineSprint {
   start: string;
   end: string;
 }
+
+export interface TimelineRelease {
+  name: string;
+  date: string;
+  released: boolean;
+}
+
+/** "from blocks to" between two issues on the timeline. */
+export interface TimelineLink {
+  from: string;
+  to: string;
+}

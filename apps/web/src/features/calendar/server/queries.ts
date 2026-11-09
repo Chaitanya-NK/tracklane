@@ -15,7 +15,7 @@ const select = {
 
 /** Issues due within [from, to] plus open issues without a due date (to drag onto the calendar). */
 export async function getCalendar(project: { id: string; key: string }, from: string, to: string) {
-  const [scheduled, unscheduled] = await Promise.all([
+  const [scheduled, unscheduled, sprints] = await Promise.all([
     db.issue.findMany({
       where: {
         projectId: project.id,
@@ -35,6 +35,15 @@ export async function getCalendar(project: { id: string; key: string }, from: st
       take: 100,
       select,
     }),
+    db.sprint.findMany({
+      where: {
+        projectId: project.id,
+        startDate: { lte: new Date(`${to}T00:00:00Z`) },
+        endDate: { gte: new Date(`${from}T00:00:00Z`) },
+      },
+      orderBy: { startDate: "asc" },
+      select: { name: true, startDate: true, endDate: true, state: true },
+    }),
   ]);
   const toItem = (i: (typeof scheduled)[number]): CalendarIssue => ({
     id: i.id,
@@ -45,5 +54,14 @@ export async function getCalendar(project: { id: string; key: string }, from: st
     status: i.status,
     due: i.dueDate ? i.dueDate.toISOString().slice(0, 10) : null,
   });
-  return { scheduled: scheduled.map(toItem), unscheduled: unscheduled.map(toItem) };
+  return {
+    scheduled: scheduled.map(toItem),
+    unscheduled: unscheduled.map(toItem),
+    sprints: sprints.map((s) => ({
+      name: s.name,
+      state: s.state,
+      start: s.startDate!.toISOString().slice(0, 10),
+      end: s.endDate!.toISOString().slice(0, 10),
+    })),
+  };
 }

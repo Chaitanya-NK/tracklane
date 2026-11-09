@@ -6,3 +6,4 @@ export {
 } from "./components/dashboard-editor";
 export { NewDashboardButton } from "./components/new-dashboard-button";
 export { WIDGET_LABELS, type Widget } from "./widgets";
+export { AutoRefresh, SortableWidgetGrid } from "./components/dashboard-live";

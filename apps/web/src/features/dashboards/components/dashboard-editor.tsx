@@ -259,7 +259,10 @@ function WidgetDialog({
   const [query, setQuery] = useState(
     widget?.config.query ?? "assignee = currentUser() AND statusCategory != done",
   );
-  const [field, setField] = useState(widget?.config.field ?? "status");
+  const [field, setField] = useState(
+    widget?.config.field ?? (widget?.type === "two_d" ? "assignee" : "status"),
+  );
+  const [field2, setField2] = useState(widget?.config.field2 ?? "statusCategory");
   const [limit, setLimit] = useState(String(widget?.config.limit ?? 5));
   const [days, setDays] = useState(String(widget?.config.days ?? 30));
   const [projectKey, setProjectKey] = useState(
@@ -268,7 +271,7 @@ function WidgetDialog({
   const [saving, setSaving] = useState(false);
   const needs = widgetNeeds(type);
   const projects =
-    type === "burndown" || type === "velocity"
+    type === "burndown" || type === "velocity" || type === "sprint_health"
       ? ctx.projects.filter((p) => p.type === "scrum")
       : ctx.projects;
   const valid = Boolean(
@@ -283,12 +286,15 @@ function WidgetDialog({
     await onSave({
       id: widget?.id ?? Math.random().toString(36).slice(2, 10),
       title: title.trim() || WIDGET_LABELS[type].label,
-      size: widget?.size ?? (type === "list" || type === "created_resolved" ? "full" : "half"),
+      size:
+        widget?.size ??
+        (type === "list" || type === "created_resolved" || type === "two_d" ? "full" : "half"),
       type,
       config: {
         ...(needs.query ? { query } : {}),
-        ...(type === "breakdown" ? { field } : {}),
-        ...(type === "list" ? { limit: Number(limit) } : {}),
+        ...(type === "breakdown" || type === "donut" || type === "two_d" ? { field } : {}),
+        ...(type === "two_d" ? { field2 } : {}),
+        ...(type === "list" || type === "resolved" ? { limit: Number(limit) } : {}),
         ...(type === "created_resolved" ? { days: Number(days) } : {}),
         ...(needs.project ? { projectKey } : {}),
       },
@@ -355,9 +361,11 @@ function WidgetDialog({
                 </FieldDescription>
               </Field>
             ) : null}
-            {type === "breakdown" ? (
+            {type === "breakdown" || type === "donut" || type === "two_d" ? (
               <Field>
-                <FieldLabel htmlFor="widget-field">Group by</FieldLabel>
+                <FieldLabel htmlFor="widget-field">
+                  {type === "two_d" ? "Rows" : "Group by"}
+                </FieldLabel>
                 <Select value={field} onValueChange={(v) => setField(v as typeof field)}>
                   <SelectTrigger id="widget-field" className="w-full">
                     <SelectValue />
@@ -372,7 +380,24 @@ function WidgetDialog({
                 </Select>
               </Field>
             ) : null}
-            {type === "list" ? (
+            {type === "two_d" ? (
+              <Field>
+                <FieldLabel htmlFor="widget-field2">Columns</FieldLabel>
+                <Select value={field2} onValueChange={(v) => setField2(v as typeof field2)}>
+                  <SelectTrigger id="widget-field2" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {BREAKDOWN_FIELD_OPTIONS.map((f) => (
+                      <SelectItem key={f} value={f}>
+                        {FIELD_LABELS[f]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            ) : null}
+            {type === "list" || type === "resolved" ? (
               <Field>
                 <FieldLabel htmlFor="widget-limit">Show</FieldLabel>
                 <Select value={limit} onValueChange={setLimit}>

@@ -12,6 +12,8 @@ export function TeamsTabs() {
       tabs={[
         { title: "Workload", href: workspacePath(workspace, "teams") },
         { title: "Timesheets", href: workspacePath(workspace, "teams/timesheets") },
+        { title: "Time off", href: workspacePath(workspace, "teams/time-off") },
+        { title: "SLAs", href: workspacePath(workspace, "teams/sla") },
       ]}
     />
   );

@@ -251,3 +251,146 @@ export async function checkSlas(now = new Date()) {
   }
   return sent;
 }
+
+export interface SlaClock {
+  policyName: string;
+  state: SlaResult["state"];
+  remainingMinutes: number;
+  targetMinutes: number;
+  /** Minutes the clock has run (or ran, if stopped). */
+  elapsedMinutes: number;
+}
+
+export interface SlaOverviewRow {
+  issueId: string;
+  key: string;
+  title: string;
+  priority: string;
+  assignee: { id: string; name: string; image: string | null } | null;
+  firstResponse: SlaClock | null;
+  resolution: SlaClock | null;
+}
+
+const RANK: Record<SlaResult["state"], number> = {
+  breached: 0,
+  at_risk: 1,
+  running: 2,
+  missed: 3,
+  met: 4,
+};
+
+/**
+ * Workspace SLA overview: every open issue under an SLA (plus ones closed in the last 30
+ * days for the met rate), worst first, with headline numbers.
+ */
+export async function slaOverview(workspaceId: string, now = new Date()) {
+  const policies = await db.slaPolicy.findMany({
+    where: { project: { workspaceId, archivedAt: null } },
+    orderBy: [{ projectId: "asc" }, { position: "asc" }],
+    select: { ...policySelect, project: { select: { name: true, key: true } } },
+  });
+  const since = new Date(now.getTime() - 30 * 86_400_000);
+  const rows = new Map<string, SlaOverviewRow>();
+  let met = 0;
+  let finished = 0;
+  const firstResponseMinutes: number[] = [];
+
+  for (const policy of policies) {
+    const where = await policyWhere(policy, workspaceId);
+    if (!where) continue;
+    const issues = await db.issue.findMany({
+      where: { AND: [where, { OR: [{ resolvedAt: null }, { resolvedAt: { gte: since } }] }] },
+      select: {
+        id: true,
+        number: true,
+        title: true,
+        priority: true,
+        createdAt: true,
+        resolvedAt: true,
+        reporterId: true,
+        assignee: { select: { id: true, name: true, image: true } },
+        project: { select: { key: true } },
+      },
+      take: 500,
+    });
+    const stops = await stopTimes(policy, issues);
+    for (const issue of issues) {
+      const stoppedAt = stops.get(issue.id) ?? null;
+      const result = evaluateSla({
+        startedAt: issue.createdAt,
+        stoppedAt,
+        targetMinutes: policy.targetMinutes,
+        warnMinutes: policy.warnMinutes,
+        now,
+      });
+      if (result.state === "met" || result.state === "missed") {
+        finished++;
+        if (result.state === "met") met++;
+      }
+      const clock: SlaClock = {
+        policyName: policy.name,
+        state: result.state,
+        remainingMinutes: result.remainingMinutes,
+        targetMinutes: policy.targetMinutes,
+        elapsedMinutes: Math.round(
+          ((stoppedAt ?? now).getTime() - issue.createdAt.getTime()) / 60_000,
+        ),
+      };
+      if (policy.metric === "first_response" && stoppedAt) {
+        firstResponseMinutes.push(clock.elapsedMinutes);
+      }
+      const row = rows.get(issue.id) ?? {
+        issueId: issue.id,
+        key: formatIssueKey(issue.project.key, issue.number),
+        title: issue.title,
+        priority: issue.priority,
+        assignee: issue.assignee,
+        firstResponse: null,
+        resolution: null,
+      };
+      const slot = policy.metric === "first_response" ? "firstResponse" : "resolution";
+      // Several policies on one metric: keep the most urgent.
+      const current = row[slot];
+      if (!current || RANK[clock.state] < RANK[current.state]) row[slot] = clock;
+      rows.set(issue.id, row);
+    }
+  }
+
+  const list = [...rows.values()];
+  const worst = (r: SlaOverviewRow) =>
+    Math.min(
+      r.firstResponse ? RANK[r.firstResponse.state] : 9,
+      r.resolution ? RANK[r.resolution.state] : 9,
+    );
+  const remaining = (r: SlaOverviewRow) =>
+    Math.min(
+      r.firstResponse?.remainingMinutes ?? Infinity,
+      r.resolution?.remainingMinutes ?? Infinity,
+    );
+  list.sort((a, b) => worst(a) - worst(b) || remaining(a) - remaining(b));
+  const clocks = list.flatMap((r) => [r.firstResponse, r.resolution].filter(Boolean)) as SlaClock[];
+  const sortedFirst = firstResponseMinutes.sort((a, b) => a - b);
+  return {
+    rows: list.filter((r) => worst(r) <= 2).slice(0, 200),
+    policies: policies.map((p) => ({
+      id: p.id,
+      name: p.name,
+      project: p.project.name,
+      projectKey: p.project.key,
+      metric: p.metric,
+      targetMinutes: p.targetMinutes,
+      warnMinutes: p.warnMinutes,
+      query: p.query,
+    })),
+    stats: {
+      metRate: finished ? Math.round((met / finished) * 100) : null,
+      breached: clocks.filter((c) => c.state === "breached").length,
+      atRisk: clocks.filter((c) => c.state === "at_risk").length,
+      medianFirstResponse: sortedFirst.length
+        ? sortedFirst[Math.floor(sortedFirst.length / 2)]!
+        : null,
+    },
+  };
+}
+
+export type SlaOverview = Awaited<ReturnType<typeof slaOverview>>;

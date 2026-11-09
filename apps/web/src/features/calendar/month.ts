@@ -25,3 +25,31 @@ export function monthLabel(month: string): string {
     timeZone: "UTC",
   }).format(new Date(`${month}-01T00:00:00Z`));
 }
+
+/** Monday of the week containing `day` (YYYY-MM-DD). */
+export function mondayOf(day: string): string {
+  const t = Date.parse(`${day}T00:00:00Z`);
+  const offset = (new Date(t).getUTCDay() + 6) % 7;
+  return new Date(t - offset * DAY).toISOString().slice(0, 10);
+}
+
+export function parseWeek(value: string | undefined, today: string): string {
+  return mondayOf(
+    value && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value)) ? value : today,
+  );
+}
+
+export function weekGrid(monday: string): string[] {
+  const start = Date.parse(`${monday}T00:00:00Z`);
+  return Array.from({ length: 7 }, (_, i) => new Date(start + i * DAY).toISOString().slice(0, 10));
+}
+
+export function shiftWeek(monday: string, delta: number): string {
+  return new Date(Date.parse(`${monday}T00:00:00Z`) + delta * 7 * DAY).toISOString().slice(0, 10);
+}
+
+export function weekLabel(monday: string): string {
+  const days = weekGrid(monday);
+  const f = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", timeZone: "UTC" });
+  return `${f.format(new Date(`${days[0]}T00:00:00Z`))} – ${f.format(new Date(`${days[6]}T00:00:00Z`))}`;
+}

@@ -16,3 +16,12 @@ describe("calendar month", () => {
     expect(monthLabel("2026-11")).toBe("November 2026");
   });
 });
+
+describe("week grid", () => {
+  it("starts on Monday", async () => {
+    const { mondayOf, weekGrid, shiftWeek } = await import("../month");
+    expect(mondayOf("2026-11-15")).toBe("2026-11-09");
+    expect(weekGrid("2026-11-09").at(-1)).toBe("2026-11-15");
+    expect(shiftWeek("2026-11-09", -1)).toBe("2026-11-02");
+  });
+});

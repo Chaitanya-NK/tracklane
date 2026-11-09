@@ -1,4 +1,4 @@
-export { issuesToCsv } from "./csv";
+export { csvField, issuesToCsv } from "./csv";
 export { getFilter, getSubscription, listFilters, type SavedFilterItem } from "./filters";
 export {
   getTqlCatalog,

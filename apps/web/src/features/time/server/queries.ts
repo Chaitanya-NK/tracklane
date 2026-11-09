@@ -57,6 +57,7 @@ export async function getTimesheet(input: {
     select: {
       minutes: true,
       date: true,
+      billable: true,
       user: { select: { id: true, name: true, image: true } },
       issue: {
         select: {
@@ -76,6 +77,8 @@ export async function getTimesheet(input: {
       issue: { id: string; key: string; title: string; type: string };
       days: number[];
       total: number;
+      /** Minutes marked billable. */
+      billableMinutes: number;
     }
   >();
   for (const w of worklogs) {
@@ -90,10 +93,12 @@ export async function getTimesheet(input: {
       },
       days: [0, 0, 0, 0, 0, 0, 0],
       total: 0,
+      billableMinutes: 0,
     };
     const index = Math.floor((w.date.getTime() - input.start.getTime()) / 86_400_000);
     row.days[index] = (row.days[index] ?? 0) + w.minutes;
     row.total += w.minutes;
+    if (w.billable) row.billableMinutes += w.minutes;
     rows.set(key, row);
   }
   return [...rows.values()].sort(

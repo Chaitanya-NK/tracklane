@@ -4,3 +4,4 @@ export {
   SlaPoliciesManager,
   type SlaPolicyRow,
 } from "./components/sla-policies-manager";
+export { SlaOverview } from "./components/sla-overview";

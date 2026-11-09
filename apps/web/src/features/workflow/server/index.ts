@@ -1,6 +1,10 @@
 export {
+  type ApprovalInboxItem,
   type ApprovalListItem,
+  type ApprovalTab,
+  countApprovalsWaiting,
   getPendingApproval,
+  listApprovalInbox,
   listApprovalsForUser,
   type PendingApproval,
 } from "./approvals";

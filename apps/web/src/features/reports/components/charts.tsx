@@ -14,7 +14,11 @@ import {
   CartesianGrid,
   LabelList,
   Line,
+  Cell,
   LineChart,
+  Pie,
+  PieChart,
+  ReferenceDot,
   XAxis,
   YAxis,
 } from "recharts";
@@ -86,6 +90,20 @@ const burndownConfig = {
   ideal: { label: "Ideal", color: "var(--viz-reference)" },
 } satisfies ChartConfig;
 
+/** Days where scope went up (issues added mid-sprint). */
+function scopeChanges(points: BurndownPoint[]) {
+  const out: { date: string; scope: number; added: number }[] = [];
+  let previous: number | null = null;
+  for (const p of points) {
+    if (p.scope === null) continue;
+    if (previous !== null && p.scope > previous) {
+      out.push({ date: p.date, scope: p.scope, added: p.scope - previous });
+    }
+    previous = p.scope;
+  }
+  return out;
+}
+
 export function BurndownChart({
   points,
   height = 260,
@@ -136,6 +154,17 @@ export function BurndownChart({
             activeDot={{ r: 4 }}
             connectNulls={false}
           />
+          {scopeChanges(points).map((p) => (
+            <ReferenceDot
+              key={p.date}
+              x={p.date}
+              y={p.scope}
+              r={5}
+              fill="var(--color-scope)"
+              stroke="var(--background)"
+              label={{ value: `+${p.added}`, position: "top", fontSize: 10 }}
+            />
+          ))}
         </LineChart>
       </ChartContainer>
       <DataTable
@@ -336,6 +365,110 @@ export function BreakdownChart({
         </BarChart>
       </ChartContainer>
       <DataTable columns={[label, "Issues"]} rows={rows.map((r) => [r.name, r.count])} />
+    </div>
+  );
+}
+
+const cycleConfig = {
+  count: { label: "Issues", color: "var(--chart-2)" },
+} satisfies ChartConfig;
+
+/** Histogram of cycle times. */
+export function CycleTimeChart({ buckets }: { buckets: { name: string; count: number }[] }) {
+  return (
+    <div>
+      <ChartContainer
+        config={cycleConfig}
+        className="h-56 w-full"
+        aria-label="Cycle time distribution"
+      >
+        <BarChart data={buckets} margin={{ left: 4, right: 12, top: 16 }}>
+          <CartesianGrid vertical={false} strokeOpacity={0.4} />
+          <XAxis dataKey="name" {...axis} />
+          <YAxis width={28} {...axis} allowDecimals={false} />
+          <ChartTooltip content={<ChartTooltipContent hideIndicator />} />
+          <Bar
+            isAnimationActive={false}
+            dataKey="count"
+            fill="var(--color-count)"
+            radius={[4, 4, 0, 0]}
+          >
+            <LabelList dataKey="count" position="top" className="fill-foreground" fontSize={11} />
+          </Bar>
+        </BarChart>
+      </ChartContainer>
+      <DataTable columns={["Cycle time", "Issues"]} rows={buckets.map((b) => [b.name, b.count])} />
+    </div>
+  );
+}
+
+const DONUT_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+];
+
+/** Share of issues per value, as a donut with the total in the middle. */
+export function DonutChart({
+  rows,
+  label,
+}: {
+  rows: { name: string; count: number }[];
+  label: string;
+}) {
+  const total = rows.reduce((s, r) => s + r.count, 0);
+  const config = Object.fromEntries(
+    rows.map((r, i) => [r.name, { label: r.name, color: DONUT_COLORS[i % DONUT_COLORS.length] }]),
+  ) satisfies ChartConfig;
+  return (
+    <div className="flex flex-wrap items-center gap-4">
+      <ChartContainer
+        config={config}
+        className="aspect-square h-44"
+        aria-label={`Issues by ${label}`}
+      >
+        <PieChart>
+          <ChartTooltip content={<ChartTooltipContent hideLabel nameKey="name" />} />
+          <Pie
+            isAnimationActive={false}
+            data={rows}
+            dataKey="count"
+            nameKey="name"
+            innerRadius="58%"
+            outerRadius="90%"
+            strokeWidth={2}
+          >
+            {rows.map((r, i) => (
+              <Cell key={r.name} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
+            ))}
+          </Pie>
+          <text
+            x="50%"
+            y="50%"
+            textAnchor="middle"
+            dominantBaseline="middle"
+            className="fill-foreground text-xl font-semibold"
+          >
+            {total}
+          </text>
+        </PieChart>
+      </ChartContainer>
+      <ul className="min-w-0 flex-1 space-y-1 text-sm">
+        {rows.map((r, i) => (
+          <li key={r.name} className="flex items-center gap-2">
+            <span
+              className="size-2.5 shrink-0 rounded-sm"
+              style={{ background: DONUT_COLORS[i % DONUT_COLORS.length] }}
+            />
+            <span className="min-w-0 flex-1 truncate">{r.name}</span>
+            <span className="text-muted-foreground tabular-nums">
+              {r.count} · {total ? Math.round((r.count / total) * 100) : 0}%
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

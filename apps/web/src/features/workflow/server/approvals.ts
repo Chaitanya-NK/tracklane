@@ -195,3 +195,71 @@ export async function cancelApproval(input: { requestId: string; userId: string 
     },
   });
 }
+
+export type ApprovalTab = "waiting" | "mine" | "done";
+
+/** The approvals page: waiting on me, requested by me, or recently decided. Newest first. */
+export async function listApprovalInbox(input: {
+  workspaceId: string;
+  userId: string;
+  role: WorkspaceRole;
+  tab: ApprovalTab;
+}) {
+  const scope = { issue: { workspaceId: input.workspaceId, project: { archivedAt: null } } };
+  const roles = rolesApprovableBy(input.role);
+  const where =
+    input.tab === "waiting"
+      ? { ...scope, state: "pending" as const, approverRole: { in: roles } }
+      : input.tab === "mine"
+        ? { ...scope, state: "pending" as const, requestedById: input.userId }
+        : {
+            ...scope,
+            state: { not: "pending" as const },
+            OR: [{ requestedById: input.userId }, { decidedById: input.userId }],
+          };
+  if (input.tab === "waiting" && !roles.length) return [];
+  const requests = await db.approvalRequest.findMany({
+    where,
+    orderBy: input.tab === "done" ? { decidedAt: "desc" } : { createdAt: "desc" },
+    take: 50,
+    select: {
+      ...requestSelect,
+      state: true,
+      decidedAt: true,
+      decidedBy: { select: { id: true, name: true } },
+      issue: {
+        select: {
+          id: true,
+          number: true,
+          title: true,
+          type: true,
+          description: true,
+          priority: true,
+          assignee: { select: { id: true, name: true, image: true } },
+          project: { select: { key: true, name: true } },
+        },
+      },
+    },
+  });
+  return requests.map((r) => ({
+    ...r,
+    key: formatIssueKey(r.issue.project.key, r.issue.number),
+    canDecide: r.state === "pending" && canApprove(input.role, r.approverRole),
+    canWithdraw: r.state === "pending" && r.requestedById === input.userId,
+  }));
+}
+
+export type ApprovalInboxItem = Awaited<ReturnType<typeof listApprovalInbox>>[number];
+
+/** How many requests wait on the user (for the sidebar badge and tab count). */
+export async function countApprovalsWaiting(workspaceId: string, role: WorkspaceRole) {
+  const roles = rolesApprovableBy(role);
+  if (!roles.length) return 0;
+  return db.approvalRequest.count({
+    where: {
+      state: "pending",
+      approverRole: { in: roles },
+      issue: { workspaceId, project: { archivedAt: null } },
+    },
+  });
+}

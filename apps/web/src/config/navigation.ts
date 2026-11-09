@@ -10,6 +10,7 @@ import {
   MessagesSquareIcon,
   PenToolIcon,
   SettingsIcon,
+  ShieldCheckIcon,
   SpadeIcon,
   TargetIcon,
   UsersIcon,
@@ -36,6 +37,7 @@ export function workspacePath(slug: string, segment = ""): Route {
 export const primaryNav: NavItem[] = [
   { title: "For you", segment: "", icon: HomeIcon, availableInPhase: 0 },
   { title: "Inbox", segment: "inbox", icon: BellIcon, availableInPhase: 6 },
+  { title: "Approvals", segment: "approvals", icon: ShieldCheckIcon, availableInPhase: 8 },
   { title: "Projects", segment: "projects", icon: FolderIcon, availableInPhase: 2 },
   { title: "Goals", segment: "goals", icon: TargetIcon, availableInPhase: 8 },
   { title: "Filters", segment: "filters", icon: FilterIcon, availableInPhase: 4 },

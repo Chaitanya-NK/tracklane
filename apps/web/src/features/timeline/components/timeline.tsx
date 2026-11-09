@@ -1,18 +1,19 @@
 "use client";
 
-import { ChevronRightIcon, PlusIcon } from "lucide-react";
+import { ChevronRightIcon, DiamondIcon, PlusIcon } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAction } from "next-safe-action/hooks";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import { Button } from "@/components/ui/button";
+import { Toggle } from "@/components/ui/toggle";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { IssueTypeIcon } from "@/features/issues";
+import { CreateIssueButton, IssueTypeIcon } from "@/features/issues";
 import { updateIssueAction } from "@/features/issues/server/actions";
 import { cn } from "@/lib/utils";
 import {
@@ -26,7 +27,13 @@ import {
   timelineScale,
   type Zoom,
 } from "../math";
-import type { TimelineEpic, TimelineItem, TimelineSprint } from "../types";
+import type {
+  TimelineEpic,
+  TimelineItem,
+  TimelineLink,
+  TimelineRelease,
+  TimelineSprint,
+} from "../types";
 
 const ROW = 40;
 const LABEL_WIDTH = 288;
@@ -62,6 +69,9 @@ export function Timeline({
   sprints,
   today,
   canEdit,
+  releases = [],
+  links = [],
+  projectKey,
 }: {
   slug: string;
   epics: TimelineEpic[];
@@ -69,7 +79,13 @@ export function Timeline({
   sprints: TimelineSprint[];
   today: string;
   canEdit: boolean;
+  releases?: TimelineRelease[];
+  links?: TimelineLink[];
+  projectKey?: string;
 }) {
+  const [showDeps, setShowDeps] = useState(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [rowTops, setRowTops] = useState<Record<string, number>>({});
   const router = useRouter();
   const [zoom, setZoom] = useState<Zoom>("weeks");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -90,10 +106,11 @@ export function Timeline({
         [
           ...allItems.flatMap((i) => [i.start, i.due]),
           ...sprints.flatMap((s) => [s.start, s.end]),
+          ...releases.map((r) => r.date),
         ].filter((d): d is string => Boolean(d)),
         today,
       ),
-    [allItems, sprints, today],
+    [allItems, sprints, releases, today],
   );
   const scale = useMemo(() => timelineScale(range, zoom), [range, zoom]);
   const width = scale.totalDays * dayWidth;
@@ -256,7 +273,7 @@ export function Timeline({
     const isEpic = item.type === "epic";
     const open = !collapsed.has(item.id);
     return (
-      <div key={item.id} className="flex border-b" style={{ height: ROW }}>
+      <div key={item.id} data-row={item.id} className="flex border-b" style={{ height: ROW }}>
         <div
           className="sticky left-0 z-10 flex shrink-0 items-center gap-2 border-r bg-background pr-2 text-sm"
           style={{ width: LABEL_WIDTH, paddingLeft: 8 + depth * 20 }}
@@ -302,6 +319,34 @@ export function Timeline({
 
   const todayOffset = daysBetween(range.start, today) * dayWidth;
 
+  // Row positions for dependency arrows (rows differ in height around section headers).
+  useLayoutEffect(() => {
+    if (!showDeps || !bodyRef.current) return;
+    const tops: Record<string, number> = {};
+    for (const el of bodyRef.current.querySelectorAll<HTMLElement>("[data-row]")) {
+      tops[el.dataset.row!] = el.offsetTop + ROW / 2;
+    }
+    setRowTops(tops);
+  }, [showDeps, collapsed, epics, loose]);
+
+  const itemById = useMemo(() => new Map(allItems.map((i) => [i.id, i])), [allItems]);
+  const arrows = showDeps
+    ? links.flatMap((link) => {
+        const from = itemById.get(link.from);
+        const to = itemById.get(link.to);
+        const y1 = rowTops[link.from];
+        const y2 = rowTops[link.to];
+        if (!from || !to || y1 === undefined || y2 === undefined) return [];
+        const a = datesOf(from);
+        const b = datesOf(to);
+        if (!a || !b) return [];
+        const x1 = (daysBetween(range.start, a.due) + 1) * dayWidth;
+        const x2 = daysBetween(range.start, b.start) * dayWidth;
+        const late = b.start <= a.due;
+        return [{ id: `${link.from}-${link.to}`, x1, y1, x2, y2, late }];
+      })
+    : [];
+
   // Open (and re-zoom) with today in view, a little in from the left edge.
   useEffect(() => {
     const viewport = scrollRoot.current?.querySelector<HTMLElement>(
@@ -324,10 +369,26 @@ export function Timeline({
           <ToggleGroupItem value="months">Months</ToggleGroupItem>
           <ToggleGroupItem value="quarters">Quarters</ToggleGroupItem>
         </ToggleGroup>
+        {links.length ? (
+          <Toggle variant="outline" size="sm" pressed={showDeps} onPressedChange={setShowDeps}>
+            Dependencies
+          </Toggle>
+        ) : null}
         {canEdit ? (
           <p className="text-xs text-muted-foreground">
             Drag bars to reschedule; drag an edge to change the start or due date.
           </p>
+        ) : null}
+        {canEdit && projectKey ? (
+          <span className="ml-auto">
+            <CreateIssueButton
+              size="sm"
+              variant="outline"
+              label="Create epic"
+              type="epic"
+              projectKey={projectKey}
+            />
+          </span>
         ) : null}
       </div>
       <ScrollArea ref={scrollRoot} className="w-full rounded-lg border">
@@ -371,6 +432,27 @@ export function Timeline({
                   {s.name}
                 </div>
               ))}
+              {releases.map((r) => (
+                <Tooltip key={`rel-${r.name}`}>
+                  <TooltipTrigger asChild>
+                    <span
+                      className={cn(
+                        "absolute top-0 -translate-x-1/2",
+                        r.released ? "text-emerald-600" : "text-violet-600",
+                      )}
+                      style={{ left: (daysBetween(range.start, r.date) + 0.5) * dayWidth }}
+                    >
+                      <DiamondIcon
+                        className="size-3.5 fill-current"
+                        aria-label={`Release ${r.name}`}
+                      />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {r.name} · {r.released ? "released" : "due"} {fmt(r.date)}
+                  </TooltipContent>
+                </Tooltip>
+              ))}
               {scale.weeks.map((w) => (
                 <div
                   key={w.offset}
@@ -384,7 +466,7 @@ export function Timeline({
           </div>
 
           {/* Body */}
-          <div className="relative">
+          <div className="relative" ref={bodyRef}>
             <div
               className="pointer-events-none absolute inset-y-0"
               style={{ left: LABEL_WIDTH, width }}
@@ -405,11 +487,67 @@ export function Timeline({
                   }}
                 ></div>
               ))}
+              {releases.map((r) => (
+                <div
+                  key={`rel-line-${r.name}`}
+                  className={cn(
+                    "absolute inset-y-0 w-px border-l border-dashed",
+                    r.released ? "border-emerald-500/60" : "border-violet-500/60",
+                  )}
+                  style={{ left: (daysBetween(range.start, r.date) + 0.5) * dayWidth }}
+                />
+              ))}
               <div
                 className="absolute inset-y-0 w-px bg-destructive"
                 style={{ left: todayOffset }}
               />
             </div>
+            {arrows.length ? (
+              <svg
+                className="pointer-events-none absolute top-0 z-[5] h-full overflow-visible"
+                style={{ left: LABEL_WIDTH, width }}
+                aria-label="Dependencies"
+                role="img"
+              >
+                <defs>
+                  <marker
+                    id="tl-arrow"
+                    viewBox="0 0 8 8"
+                    refX="7"
+                    refY="4"
+                    markerWidth="7"
+                    markerHeight="7"
+                    orient="auto"
+                  >
+                    <path d="M0 0 8 4 0 8z" className="fill-muted-foreground" />
+                  </marker>
+                  <marker
+                    id="tl-arrow-late"
+                    viewBox="0 0 8 8"
+                    refX="7"
+                    refY="4"
+                    markerWidth="7"
+                    markerHeight="7"
+                    orient="auto"
+                  >
+                    <path d="M0 0 8 4 0 8z" className="fill-destructive" />
+                  </marker>
+                </defs>
+                {arrows.map((a) => {
+                  const mid = Math.max(a.x1 + 10, (a.x1 + a.x2) / 2);
+                  return (
+                    <path
+                      key={a.id}
+                      d={`M${a.x1} ${a.y1} H${mid} V${a.y2} H${a.x2 - 2}`}
+                      fill="none"
+                      strokeWidth={1.5}
+                      className={a.late ? "stroke-destructive" : "stroke-muted-foreground"}
+                      markerEnd={`url(#${a.late ? "tl-arrow-late" : "tl-arrow"})`}
+                    />
+                  );
+                })}
+              </svg>
+            ) : null}
             {epics.map((epic) => (
               <Fragment key={epic.id}>
                 {renderRow(epic, 0, epic)}
