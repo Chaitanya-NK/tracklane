@@ -169,6 +169,29 @@ state = pending`, so two approvers can't both decide) and then applies the statu
 - **Email verification.** Better Auth sends a confirmation link on sign-up; a banner offers
   to resend it. `REQUIRE_EMAIL_VERIFICATION=true` blocks sign-in until confirmed.
 
+## Reports, time and SLAs
+
+- **Snapshots.** The worker's `reports.snapshot` job (hourly, and on start) stores one
+  `project_snapshots` row per project per UTC day: issues per status/category and the active
+  sprint's scope and remaining points (`measureProject` in `@tracklane/db`). Reports measure
+  today live, so they're current even if the worker hasn't run.
+- **Charts** (`features/reports`). Burndown, velocity, cumulative flow, created vs resolved,
+  breakdowns and workload. The maths is pure and tested in `@tracklane/core/reports`; charts
+  use shadcn `chart` (Recharts) with the validated categorical palette in `--viz-1…5`
+  (`globals.css`), one y-axis per chart, and a "View data" table under each.
+- **Time tracking** (`features/time`). `worklogs` rows (minutes per day) and
+  `issues.time_estimate`. Durations parse like Jira (`1w 2d 3h 30m`, 8-hour days). The Team
+  page has workload and weekly timesheets.
+- **SLAs** (`features/sla`). Per-project policies: a TQL condition, first response (first
+  comment by someone other than the reporter) or resolution, and a calendar-time target.
+  `evaluateSla` gives running / at risk / breached / met / missed. The worker calls
+  `POST /api/internal/sla-check` every 5 minutes (bearer token derived from
+  `BETTER_AUTH_SECRET`, see `server/internal.ts`), which notifies the assignee or project lead
+  once per state (`sla_notices`).
+- **Dashboards** (`features/dashboards`). Widgets are JSON on the dashboard (validated with
+  `widgetSchema` on write, read defensively). Each widget renders on the server in its own
+  Suspense boundary; TQL widgets run as the viewer (`currentUser()` is whoever looks).
+
 ## Search, filters and views
 
 - **TQL** (see [TQL.md](TQL.md)) is parsed in `@tracklane/core` and compiled to Prisma in

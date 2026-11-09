@@ -93,18 +93,18 @@ Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before adding features.
 
 ## Roadmap
 
-| #   | Phase                    | Scope                                                               |
-| --- | ------------------------ | ------------------------------------------------------------------- |
-| 0   | Foundation ✅            | Monorepo, tooling, dev container, CI, app shell, dark mode          |
-| 1   | Auth & workspaces        | Sign-in, onboarding, members, roles                                 |
-| 2   | Projects & issues        | Projects, issue detail, comments, activity, labels, attachments     |
-| 3   | Board & backlog          | Drag-and-drop board, sprints, swimlanes, quick view, shortcuts      |
-| 4   | Views & search           | List view, saved views, TQL search, calendar, timeline, ⌘K          |
-| 5   | Workflow & fields        | Workflow editor, approvals, custom fields, TQL functions, swimlanes |
-| 6   | Notifications & realtime | Inbox, mentions, email, push, live updates, presence, resolutions   |
-| 7   | Reports & time           | Burndown, velocity, CFD, dashboards, workload, timesheets, SLAs     |
-| 8   | Planning tools           | Releases, goals, automation, dependency graph, recurring issues     |
-| 9   | Collaboration            | Docs, diagrams as code, whiteboard, retros, planning poker          |
-| 10  | AI (Gemini free tier)    | Plain-English search, duplicate detection, release notes, assistant |
-| 11  | API & public pages       | REST API v1, webhooks, API docs, request portal, roadmap, status    |
-| 12  | Hardening                | Audit log, SSO, i18n, accessibility, PWA, e2e tests                 |
+| #   | Phase                       | Scope                                                               |
+| --- | --------------------------- | ------------------------------------------------------------------- |
+| 0   | Foundation ✅               | Monorepo, tooling, dev container, CI, app shell, dark mode          |
+| 1   | Auth & workspaces ✅        | Sign-in, onboarding, members, roles                                 |
+| 2   | Projects & issues ✅        | Projects, issue detail, comments, activity, labels, attachments     |
+| 3   | Board & backlog ✅          | Drag-and-drop board, sprints, swimlanes, quick view, shortcuts      |
+| 4   | Views & search ✅           | List view, saved views, TQL search, calendar, timeline, ⌘K          |
+| 5   | Workflow & fields ✅        | Workflow editor, approvals, custom fields, TQL functions, swimlanes |
+| 6   | Notifications & realtime ✅ | Inbox, mentions, email, push, live updates, presence, resolutions   |
+| 7   | Reports & time ✅           | Burndown, velocity, CFD, dashboards, workload, timesheets, SLAs     |
+| 8   | Planning tools              | Releases, goals, automation, dependency graph, recurring issues     |
+| 9   | Collaboration               | Docs, diagrams as code, whiteboard, retros, planning poker          |
+| 10  | AI (Gemini free tier)       | Plain-English search, duplicate detection, release notes, assistant |
+| 11  | API & public pages          | REST API v1, webhooks, API docs, request portal, roadmap, status    |
+| 12  | Hardening                   | Audit log, SSO, i18n, accessibility, PWA, e2e tests                 |
