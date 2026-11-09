@@ -36,47 +36,49 @@ model User {
   /// Workspace opened most recently; "/" redirects there.
   lastWorkspaceId String? @map("last_workspace_id")
 
-  sessions           Session[]
-  accounts           Account[]
-  memberships        WorkspaceMember[]
-  invitationsSent    WorkspaceInvitation[]    @relation("InvitedBy")
-  workspacesCreated  Workspace[]              @relation("WorkspaceCreatedBy")
-  projectsLed        Project[]                @relation("ProjectLead")
-  projectsCreated    Project[]                @relation("ProjectCreatedBy")
-  issuesAssigned     Issue[]                  @relation("IssueAssignee")
-  issuesReported     Issue[]                  @relation("IssueReporter")
-  comments           Comment[]
-  attachments        Attachment[]
-  issueActivities    IssueActivity[]
-  savedFilters       SavedFilter[]
-  filterFavorites    FilterFavorite[]
-  approvalsRequested ApprovalRequest[]        @relation("ApprovalRequester")
-  approvalsDecided   ApprovalRequest[]        @relation("ApprovalDecider")
-  fieldValues        IssueFieldValue[]
-  tqlFunctions       TqlFunction[]
-  notifications      Notification[]           @relation("NotificationRecipient")
-  notificationsSent  Notification[]           @relation("NotificationActor")
-  watching           IssueWatcher[]
-  notificationPrefs  NotificationPreference[]
-  pushSubscriptions  PushSubscription[]
-  worklogs           Worklog[]
-  dashboards         Dashboard[]
-  goalsOwned         Goal[]
-  issueLinksCreated  IssueLink[]
-  automationRules    AutomationRule[]
-  docsCreated        Doc[]                    @relation("DocCreatedBy")
-  docsUpdated        Doc[]                    @relation("DocUpdatedBy")
-  docVersions        DocVersion[]
-  whiteboards        Whiteboard[]
-  retrosCreated      Retro[]
-  retroCards         RetroCard[]
-  retroVotes         RetroVote[]
-  pokerSessions      PokerSession[]
-  pokerVotes         PokerVote[]
-  apiTokens          ApiToken[]
-  webhooksCreated    Webhook[]
-  incidentsCreated   Incident[]
-  incidentUpdates    IncidentUpdate[]
+  sessions            Session[]
+  accounts            Account[]
+  memberships         WorkspaceMember[]
+  invitationsSent     WorkspaceInvitation[]    @relation("InvitedBy")
+  workspacesCreated   Workspace[]              @relation("WorkspaceCreatedBy")
+  projectsLed         Project[]                @relation("ProjectLead")
+  projectsCreated     Project[]                @relation("ProjectCreatedBy")
+  issuesAssigned      Issue[]                  @relation("IssueAssignee")
+  issuesReported      Issue[]                  @relation("IssueReporter")
+  comments            Comment[]
+  attachments         Attachment[]
+  issueActivities     IssueActivity[]
+  savedFilters        SavedFilter[]
+  filterFavorites     FilterFavorite[]
+  filterSubscriptions FilterSubscription[]
+  projectViews        ProjectView[]
+  approvalsRequested  ApprovalRequest[]        @relation("ApprovalRequester")
+  approvalsDecided    ApprovalRequest[]        @relation("ApprovalDecider")
+  fieldValues         IssueFieldValue[]
+  tqlFunctions        TqlFunction[]
+  notifications       Notification[]           @relation("NotificationRecipient")
+  notificationsSent   Notification[]           @relation("NotificationActor")
+  watching            IssueWatcher[]
+  notificationPrefs   NotificationPreference[]
+  pushSubscriptions   PushSubscription[]
+  worklogs            Worklog[]
+  dashboards          Dashboard[]
+  goalsOwned          Goal[]
+  issueLinksCreated   IssueLink[]
+  automationRules     AutomationRule[]
+  docsCreated         Doc[]                    @relation("DocCreatedBy")
+  docsUpdated         Doc[]                    @relation("DocUpdatedBy")
+  docVersions         DocVersion[]
+  whiteboards         Whiteboard[]
+  retrosCreated       Retro[]
+  retroCards          RetroCard[]
+  retroVotes          RetroVote[]
+  pokerSessions       PokerSession[]
+  pokerVotes          PokerVote[]
+  apiTokens           ApiToken[]
+  webhooksCreated     Webhook[]
+  incidentsCreated    Incident[]
+  incidentUpdates     IncidentUpdate[]
 
   @@map("users")
 }
@@ -297,6 +299,7 @@ model Project {
   retros          Retro[]
   pokerSessions   PokerSession[]
   portalRequests  PortalRequest[]
+  views           ProjectView[]
   backlogStatus   WorkflowStatus?      @relation("ProjectBacklogStatus", fields: [backlogStatusId], references: [id], onDelete: SetNull)
 
   @@unique([workspaceId, key])
@@ -537,9 +540,10 @@ model SavedFilter {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  workspace Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  owner     User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  favorites FilterFavorite[]
+  workspace     Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  owner         User                 @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  favorites     FilterFavorite[]
+  subscriptions FilterSubscription[]
 
   @@index([workspaceId, ownerId])
   @@map("saved_filters")
@@ -557,6 +561,54 @@ model FilterFavorite {
   @@id([filterId, userId])
   @@index([userId])
   @@map("filter_favorites")
+}
+
+enum DigestFrequency {
+  daily
+  weekly
+}
+
+/// Emails a filter's results to a user on a schedule.
+model FilterSubscription {
+  filterId   String          @map("filter_id")
+  userId     String          @map("user_id")
+  frequency  DigestFrequency @default(daily)
+  lastSentAt DateTime?       @map("last_sent_at")
+  createdAt  DateTime        @default(now()) @map("created_at")
+
+  filter SavedFilter @relation(fields: [filterId], references: [id], onDelete: Cascade)
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([filterId, userId])
+  @@index([userId])
+  @@map("filter_subscriptions")
+}
+
+/// A saved arrangement of a project's issue list: filters, grouping and columns.
+model ProjectView {
+  id        String   @id @default(cuid())
+  projectId String   @map("project_id")
+  ownerId   String   @map("owner_id")
+  name      String
+  /// The list's query string (status=…&type=…&sort=…), without the view parameter.
+  params    String   @default("")
+  groupBy   String   @default("none") @map("group_by")
+  columns   String[] @default([])
+  /// Visible to everyone in the project; otherwise only to the owner.
+  shared    Boolean  @default(false)
+  /// Others may save changes to a shared view.
+  editable  Boolean  @default(false)
+  /// Opens by default for everyone (one per project).
+  isDefault Boolean  @default(false) @map("is_default")
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  owner   User    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("project_views")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
