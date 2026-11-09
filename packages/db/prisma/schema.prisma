@@ -37,6 +37,7 @@ model User {
   lastWorkspaceId String? @map("last_workspace_id")
 
   sessions            Session[]
+  auditEvents         AuditEvent[]
   accounts            Account[]
   memberships         WorkspaceMember[]
   invitationsSent     WorkspaceInvitation[]    @relation("InvitedBy")
@@ -194,6 +195,7 @@ model Workspace {
   timeOff          TimeOff[]
   timesheets       TimesheetSubmission[]
   integrations     Integration[]
+  auditEvents      AuditEvent[]
   apiRequests      ApiRequestLog[]
 
   @@map("workspaces")
@@ -1847,4 +1849,31 @@ model RoadmapSubscriber {
 
   @@id([projectId, email])
   @@map("roadmap_subscribers")
+}
+
+/// Who changed what in a workspace: members, roles, settings, tokens, integrations, projects.
+/// Kept for a year (worker retention job). Actor name/email are snapshots so history survives
+/// user deletion.
+model AuditEvent {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  actorId     String?  @map("actor_id")
+  actorName   String   @map("actor_name")
+  /// Dotted action name, e.g. "member.role_changed".
+  action      String
+  targetType  String?  @map("target_type")
+  targetId    String?  @map("target_id")
+  targetLabel String?  @map("target_label")
+  metadata    Json     @default("{}")
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actor     User?     @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, action, createdAt])
+  @@index([actorId])
+  @@map("audit_events")
 }
