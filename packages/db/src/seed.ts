@@ -344,6 +344,7 @@ async function seedDemoProject(workspaceId: string, demoUserId: string) {
   await seedPhase7(workspaceId, project.id, demoUserId, priya.id);
   await seedPhase8(workspaceId, project.id, ids, demoUserId, priya.id);
   await seedPhase9(workspaceId, project.id, demoUserId, priya.id);
+  await seedPhase11(workspaceId, project.id, demoUserId);
 
   await db.comment.createMany({
     data: [
@@ -1087,6 +1088,58 @@ async function seedPhase9(
       },
     });
   }
+}
+
+/** Public pages: the portal and roadmap are on for the demo project; a public status page. */
+async function seedPhase11(workspaceId: string, projectId: string, demoUserId: string) {
+  await db.project.update({
+    where: { id: projectId },
+    data: { portalEnabled: true, roadmapPublic: true },
+  });
+  await db.workspace.update({ where: { id: workspaceId }, data: { statusPagePublic: true } });
+  const existing = await db.statusComponent.count({ where: { workspaceId } });
+  if (existing) return;
+  const names = ["Website", "API", "Payments", "Email notifications"];
+  const components = [];
+  for (const [position, name] of names.entries()) {
+    components.push(await db.statusComponent.create({ data: { workspaceId, name, position } }));
+  }
+  const DAY = 86_400_000;
+  const start = new Date(Date.now() - 6 * DAY);
+  await db.incident.create({
+    data: {
+      workspaceId,
+      title: "Card payments failing for some customers",
+      impact: "major",
+      status: "resolved",
+      createdById: demoUserId,
+      createdAt: start,
+      resolvedAt: new Date(start.getTime() + 90 * 60_000),
+      components: { create: [{ componentId: components[2]!.id }] },
+      updates: {
+        create: [
+          {
+            status: "investigating",
+            body: "Some card payments are being declined. We're looking into it.",
+            authorId: demoUserId,
+            createdAt: start,
+          },
+          {
+            status: "identified",
+            body: "A certificate expired at our payment provider's 3-D Secure gateway. A fix is rolling out.",
+            authorId: demoUserId,
+            createdAt: new Date(start.getTime() + 30 * 60_000),
+          },
+          {
+            status: "resolved",
+            body: "Payments are succeeding normally again. Sorry for the trouble.",
+            authorId: demoUserId,
+            createdAt: new Date(start.getTime() + 90 * 60_000),
+          },
+        ],
+      },
+    },
+  });
 }
 
 async function main() {

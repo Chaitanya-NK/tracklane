@@ -73,6 +73,10 @@ model User {
   retroVotes         RetroVote[]
   pokerSessions      PokerSession[]
   pokerVotes         PokerVote[]
+  apiTokens          ApiToken[]
+  webhooksCreated    Webhook[]
+  incidentsCreated   Incident[]
+  incidentUpdates    IncidentUpdate[]
 
   @@map("users")
 }
@@ -141,29 +145,35 @@ enum WorkspaceRole {
 }
 
 model Workspace {
-  id          String   @id @default(cuid())
-  name        String
+  id               String   @id @default(cuid())
+  name             String
   /// URL segment: tracklane.app/<slug>/…
-  slug        String   @unique
-  createdById String?  @map("created_by_id")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  slug             String   @unique
+  /// Anyone can see /status/<slug> when true.
+  statusPagePublic Boolean  @default(false) @map("status_page_public")
+  createdById      String?  @map("created_by_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
-  createdBy     User?                 @relation("WorkspaceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  members       WorkspaceMember[]
-  invitations   WorkspaceInvitation[]
-  projects      Project[]
-  issues        Issue[]
-  savedFilters  SavedFilter[]
-  tqlFunctions  TqlFunction[]
-  resolutions   Resolution[]
-  notifications Notification[]
-  dashboards    Dashboard[]
-  goals         Goal[]
-  docs          Doc[]
-  whiteboards   Whiteboard[]
-  retros        Retro[]
-  pokerSessions PokerSession[]
+  createdBy        User?                 @relation("WorkspaceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  members          WorkspaceMember[]
+  invitations      WorkspaceInvitation[]
+  projects         Project[]
+  issues           Issue[]
+  savedFilters     SavedFilter[]
+  tqlFunctions     TqlFunction[]
+  resolutions      Resolution[]
+  notifications    Notification[]
+  dashboards       Dashboard[]
+  goals            Goal[]
+  docs             Doc[]
+  whiteboards      Whiteboard[]
+  retros           Retro[]
+  pokerSessions    PokerSession[]
+  apiTokens        ApiToken[]
+  webhooks         Webhook[]
+  statusComponents StatusComponent[]
+  incidents        Incident[]
 
   @@map("workspaces")
 }
@@ -258,6 +268,10 @@ model Project {
   restrictTransitions Boolean     @default(false) @map("restrict_transitions")
   /// Kanban only: issues in this status live in the Backlog tab instead of on the board.
   backlogStatusId     String?     @unique @map("backlog_status_id")
+  /// Public request form at /portal/<workspace>/<key>.
+  portalEnabled       Boolean     @default(false) @map("portal_enabled")
+  /// Public roadmap at /roadmap/<workspace>/<key>.
+  roadmapPublic       Boolean     @default(false) @map("roadmap_public")
   createdById         String?     @map("created_by_id")
   archivedAt          DateTime?   @map("archived_at")
   createdAt           DateTime    @default(now()) @map("created_at")
@@ -282,6 +296,7 @@ model Project {
   whiteboards     Whiteboard[]
   retros          Retro[]
   pokerSessions   PokerSession[]
+  portalRequests  PortalRequest[]
   backlogStatus   WorkflowStatus?      @relation("ProjectBacklogStatus", fields: [backlogStatusId], references: [id], onDelete: SetNull)
 
   @@unique([workspaceId, key])
@@ -360,6 +375,7 @@ model Issue {
   linksIn        IssueLink[]       @relation("IssueLinkTarget")
   automationRuns AutomationRun[]
   retroCards     RetroCard[]
+  portalRequest  PortalRequest?
   project        Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
   status         WorkflowStatus    @relation(fields: [statusId], references: [id], onDelete: Restrict)
   assignee       User?             @relation("IssueAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
@@ -1293,4 +1309,182 @@ model PokerVote {
 
   @@id([sessionId, issueId, userId])
   @@map("poker_votes")
+}
+
+enum ApiTokenScope {
+  read
+  write
+}
+
+/// A personal access token for the REST API. Only a hash is stored.
+model ApiToken {
+  id          String        @id @default(cuid())
+  workspaceId String        @map("workspace_id")
+  userId      String        @map("user_id")
+  name        String
+  /// First characters of the token, shown so people can tell tokens apart.
+  prefix      String
+  tokenHash   String        @unique @map("token_hash")
+  scope       ApiTokenScope @default(read)
+  lastUsedAt  DateTime?     @map("last_used_at")
+  expiresAt   DateTime?     @map("expires_at")
+  revokedAt   DateTime?     @map("revoked_at")
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, userId])
+  @@map("api_tokens")
+}
+
+model Webhook {
+  id           String   @id @default(cuid())
+  workspaceId  String   @map("workspace_id")
+  url          String
+  /// HMAC-SHA256 signing secret, shown once.
+  secret       String
+  /// Event names, e.g. ["issue.created", "comment.created"].
+  events       String[]
+  active       Boolean  @default(true)
+  /// Consecutive failed deliveries; the hook is disabled after too many.
+  failureCount Int      @default(0) @map("failure_count")
+  createdById  String?  @map("created_by_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  workspace  Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy  User?             @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  deliveries WebhookDelivery[]
+
+  @@index([workspaceId])
+  @@map("webhooks")
+}
+
+enum WebhookDeliveryStatus {
+  pending
+  delivered
+  failed
+}
+
+/// Outbox row per event per hook; the worker delivers and retries with backoff.
+model WebhookDelivery {
+  id             String                @id @default(cuid())
+  webhookId      String                @map("webhook_id")
+  event          String
+  payload        Json
+  status         WebhookDeliveryStatus @default(pending)
+  attempts       Int                   @default(0)
+  nextAttemptAt  DateTime              @default(now()) @map("next_attempt_at")
+  responseStatus Int?                  @map("response_status")
+  error          String?
+  createdAt      DateTime              @default(now()) @map("created_at")
+  deliveredAt    DateTime?             @map("delivered_at")
+
+  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt])
+  @@index([webhookId, createdAt])
+  @@map("webhook_deliveries")
+}
+
+/// Someone outside the workspace who asked for something through the portal.
+model PortalRequest {
+  id        String   @id @default(cuid())
+  projectId String   @map("project_id")
+  issueId   String   @unique @map("issue_id")
+  name      String
+  email     String
+  /// Secret for the requester's tracking link.
+  token     String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  issue   Issue   @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+  @@map("portal_requests")
+}
+
+enum ComponentStatus {
+  operational
+  degraded
+  partial_outage
+  major_outage
+  maintenance
+}
+
+model StatusComponent {
+  id          String          @id @default(cuid())
+  workspaceId String          @map("workspace_id")
+  name        String
+  description String          @default("")
+  status      ComponentStatus @default(operational)
+  position    Int             @default(0)
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  workspace Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  incidents IncidentComponent[]
+
+  @@index([workspaceId])
+  @@map("status_components")
+}
+
+enum IncidentImpact {
+  minor
+  major
+  critical
+  maintenance
+}
+
+enum IncidentStatus {
+  investigating
+  identified
+  monitoring
+  resolved
+}
+
+model Incident {
+  id          String         @id @default(cuid())
+  workspaceId String         @map("workspace_id")
+  title       String
+  impact      IncidentImpact @default(minor)
+  status      IncidentStatus @default(investigating)
+  createdById String?        @map("created_by_id")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  resolvedAt  DateTime?      @map("resolved_at")
+
+  workspace  Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy  User?               @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  updates    IncidentUpdate[]
+  components IncidentComponent[]
+
+  @@index([workspaceId, createdAt])
+  @@map("incidents")
+}
+
+model IncidentUpdate {
+  id         String         @id @default(cuid())
+  incidentId String         @map("incident_id")
+  status     IncidentStatus
+  body       String
+  authorId   String?        @map("author_id")
+  createdAt  DateTime       @default(now()) @map("created_at")
+
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  author   User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([incidentId, createdAt])
+  @@map("incident_updates")
+}
+
+model IncidentComponent {
+  incidentId  String @map("incident_id")
+  componentId String @map("component_id")
+
+  incident  Incident        @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  component StatusComponent @relation(fields: [componentId], references: [id], onDelete: Cascade)
+
+  @@id([incidentId, componentId])
+  @@map("incident_components")
 }
