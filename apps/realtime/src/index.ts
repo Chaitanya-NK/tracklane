@@ -1,9 +1,10 @@
 import { createServer } from "node:http";
 import { verifyRealtimeToken } from "@tracklane/core";
-import { Server } from "socket.io";
+import { Server, type Socket } from "socket.io";
 import { startBridge } from "./bridge";
 import { env } from "./env";
 import { registerPresenceHandlers, type SocketData } from "./handlers/presence";
+import { registerRelayHandlers } from "./handlers/relay";
 import { logger } from "./lib/logger";
 
 const httpServer = createServer((req, res) => {
@@ -25,6 +26,8 @@ const io = new Server<
 >(httpServer, {
   path: "/api/realtime",
   addTrailingSlash: false,
+  // Whiteboard scenes are relayed whole; leave room for large boards.
+  maxHttpBufferSize: 5e6,
   cors: { origin: [env.NEXT_PUBLIC_APP_URL], credentials: true },
 });
 
@@ -40,6 +43,7 @@ io.use(async (socket, next) => {
 io.on("connection", (socket) => {
   logger.debug({ socketId: socket.id, userId: socket.data.user.sub }, "connected");
   registerPresenceHandlers(io, socket);
+  registerRelayHandlers(socket as unknown as Socket);
 });
 
 const stopBridge = startBridge(io as unknown as Server);

@@ -33,14 +33,15 @@ async function presenceOf(io: AppServer, room: string) {
 }
 
 async function broadcastPresence(io: AppServer, room: string) {
-  // Only issue rooms show who's looking; project rooms can be busy and nobody needs the list.
-  if (!room.includes(":issue:")) return;
+  // Project rooms can be busy and nobody needs the list; every other room shows who's there.
+  if (room.includes(":project:")) return;
   (io as Server).to(room).emit("presence:update", { room, users: await presenceOf(io, room) });
 }
 
 /**
  * Rooms: "user:<id>" (joined automatically), "ws:<workspace>:project:<id>" and
- * "ws:<workspace>:issue:<id>". A socket may only join rooms in the workspaces in its token.
+ * "ws:<workspace>:<issue|doc|whiteboard|retro|poker>:<id>". A socket may only join rooms in the
+ * workspaces in its token.
  */
 export function registerPresenceHandlers(io: AppServer, socket: AppSocket) {
   const { user } = socket.data;
@@ -62,7 +63,7 @@ export function registerPresenceHandlers(io: AppServer, socket: AppSocket) {
   });
 
   socket.on("disconnecting", () => {
-    const rooms = [...socket.rooms].filter((r) => r.includes(":issue:"));
+    const rooms = [...socket.rooms].filter((r) => r.startsWith("ws:") && !r.includes(":project:"));
     // After the socket has left, tell the rest who's still there.
     setTimeout(() => rooms.forEach((room) => void broadcastPresence(io, room)), 50);
   });
