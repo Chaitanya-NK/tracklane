@@ -10,6 +10,9 @@ const schema = z.object({
   NEXT_PUBLIC_VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_SUBJECT: z.string().default("mailto:no-reply@tracklane.local"),
+  /** Where the worker reaches the web app's internal endpoints (SLA checks). */
+  INTERNAL_APP_URL: z.string().url().default("http://localhost:3000"),
+  BETTER_AUTH_SECRET: z.string().min(32).optional(),
 });
 
 /** Validated environment. Fails fast at startup with a readable message. */

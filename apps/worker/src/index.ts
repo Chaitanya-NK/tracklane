@@ -13,6 +13,7 @@ async function main() {
     await boss.createQueue(job.name);
     await boss.work(job.name, job.handler);
     if (job.cron) await boss.schedule(job.name, job.cron);
+    if (job.runOnStart) await boss.send(job.name, {});
     logger.info({ job: job.name, cron: job.cron ?? null }, "registered job");
   }
 

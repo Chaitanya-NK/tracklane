@@ -7,5 +7,7 @@ import type PgBoss from "pg-boss";
 export interface JobDefinition<TData extends object = Record<string, never>> {
   name: string;
   cron?: string;
+  /** Also run once when the worker starts (catch up after downtime). */
+  runOnStart?: boolean;
   handler: (jobs: PgBoss.Job<TData>[]) => Promise<void>;
 }
