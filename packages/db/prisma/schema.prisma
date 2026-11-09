@@ -86,6 +86,9 @@ model User {
   timesheets          TimesheetSubmission[]    @relation("TimesheetOwner")
   timesheetsReviewed  TimesheetSubmission[]    @relation("TimesheetReviewer")
   activeTimer         ActiveTimer?
+  issueViews          IssueView[]
+  issueStars          IssueStar[]
+  projectStars        ProjectStar[]
 
   @@map("users")
 }
@@ -160,6 +163,11 @@ model Workspace {
   slug             String   @unique
   /// Anyone can see /status/<slug> when true.
   statusPagePublic Boolean  @default(false) @map("status_page_public")
+  /// People who sign up with this email domain join automatically (as members).
+  allowedDomain    String?  @map("allowed_domain")
+  /// Answers from the onboarding wizard.
+  teamSize         String?  @map("team_size")
+  useCases         String[] @default([]) @map("use_cases")
   createdById      String?  @map("created_by_id")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
@@ -185,17 +193,21 @@ model Workspace {
   incidents        Incident[]
   timeOff          TimeOff[]
   timesheets       TimesheetSubmission[]
+  integrations     Integration[]
+  apiRequests      ApiRequestLog[]
 
   @@map("workspaces")
 }
 
 model WorkspaceMember {
-  id          String        @id @default(cuid())
-  workspaceId String        @map("workspace_id")
-  userId      String        @map("user_id")
-  role        WorkspaceRole @default(member)
-  createdAt   DateTime      @default(now()) @map("created_at")
-  updatedAt   DateTime      @updatedAt @map("updated_at")
+  id           String        @id @default(cuid())
+  workspaceId  String        @map("workspace_id")
+  userId       String        @map("user_id")
+  role         WorkspaceRole @default(member)
+  /// Last time they opened the workspace (updated at most every few minutes).
+  lastActiveAt DateTime?     @map("last_active_at")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -288,29 +300,31 @@ model Project {
   createdAt           DateTime    @default(now()) @map("created_at")
   updatedAt           DateTime    @updatedAt @map("updated_at")
 
-  workspace       Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  lead            User?                @relation("ProjectLead", fields: [leadId], references: [id], onDelete: SetNull)
-  createdBy       User?                @relation("ProjectCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  statuses        WorkflowStatus[]
-  issues          Issue[]
-  labels          Label[]
-  sprints         Sprint[]
-  transitions     WorkflowTransition[]
-  customFields    CustomField[]
-  snapshots       ProjectSnapshot[]
-  slaPolicies     SlaPolicy[]
-  releases        Release[]
-  automationRules AutomationRule[]
-  recurringIssues RecurringIssue[]
-  issueTypes      ProjectIssueType[]
-  docs            Doc[]
-  whiteboards     Whiteboard[]
-  retros          Retro[]
-  pokerSessions   PokerSession[]
-  portalRequests  PortalRequest[]
-  views           ProjectView[]
-  components      ProjectComponent[]
-  backlogStatus   WorkflowStatus?      @relation("ProjectBacklogStatus", fields: [backlogStatusId], references: [id], onDelete: SetNull)
+  workspace          Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  lead               User?                @relation("ProjectLead", fields: [leadId], references: [id], onDelete: SetNull)
+  createdBy          User?                @relation("ProjectCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  statuses           WorkflowStatus[]
+  issues             Issue[]
+  labels             Label[]
+  sprints            Sprint[]
+  transitions        WorkflowTransition[]
+  customFields       CustomField[]
+  snapshots          ProjectSnapshot[]
+  slaPolicies        SlaPolicy[]
+  releases           Release[]
+  automationRules    AutomationRule[]
+  recurringIssues    RecurringIssue[]
+  issueTypes         ProjectIssueType[]
+  docs               Doc[]
+  whiteboards        Whiteboard[]
+  retros             Retro[]
+  pokerSessions      PokerSession[]
+  portalRequests     PortalRequest[]
+  views              ProjectView[]
+  components         ProjectComponent[]
+  stars              ProjectStar[]
+  roadmapSubscribers RoadmapSubscriber[]
+  backlogStatus      WorkflowStatus?      @relation("ProjectBacklogStatus", fields: [backlogStatusId], references: [id], onDelete: SetNull)
 
   @@unique([workspaceId, key])
   @@map("projects")
@@ -381,6 +395,10 @@ model Issue {
 
   components     IssueComponent[]
   timers         ActiveTimer[]
+  views          IssueView[]
+  stars          IssueStar[]
+  devLinks       DevLink[]
+  votes          RoadmapVote[]
   workspace      Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   resolution     Resolution?       @relation(fields: [resolutionId], references: [id], onDelete: SetNull)
   watchers       IssueWatcher[]
@@ -1556,6 +1574,8 @@ model Webhook {
   secret       String
   /// Event names, e.g. ["issue.created", "comment.created"].
   events       String[]
+  /// "json" (signed Tracklane payload) or "slack" (an incoming-webhook { text } message).
+  format       String   @default("json")
   active       Boolean  @default(true)
   /// Consecutive failed deliveries; the hook is disabled after too many.
   failureCount Int      @default(0) @map("failure_count")
@@ -1697,4 +1717,134 @@ model IncidentComponent {
 
   @@id([incidentId, componentId])
   @@map("incident_components")
+}
+
+/// When a person last opened an issue (the home page's "Viewed" tab).
+model IssueView {
+  userId   String   @map("user_id")
+  issueId  String   @map("issue_id")
+  viewedAt DateTime @default(now()) @map("viewed_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  issue Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+  @@id([userId, issueId])
+  @@index([userId, viewedAt])
+  @@map("issue_views")
+}
+
+model IssueStar {
+  userId    String   @map("user_id")
+  issueId   String   @map("issue_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  issue Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+  @@id([userId, issueId])
+  @@map("issue_stars")
+}
+
+model ProjectStar {
+  userId    String   @map("user_id")
+  projectId String   @map("project_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([userId, projectId])
+  @@map("project_stars")
+}
+
+enum IntegrationKind {
+  github
+  slack
+}
+
+/// A connected outside service (GitHub repository webhooks, Slack incoming webhook).
+model Integration {
+  id          String          @id @default(cuid())
+  workspaceId String          @map("workspace_id")
+  kind        IntegrationKind
+  /// GitHub: { repo, autoTransition, doneStatus } · Slack: { url, events }.
+  config      Json            @default("{}")
+  /// Shared secret for verifying incoming webhooks (GitHub).
+  secret      String?
+  enabled     Boolean         @default(true)
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, kind])
+  @@map("integrations")
+}
+
+enum DevLinkKind {
+  branch
+  pull_request
+  commit
+}
+
+/// A branch, pull request or commit that mentions an issue key.
+model DevLink {
+  id         String      @id @default(cuid())
+  issueId    String      @map("issue_id")
+  kind       DevLinkKind
+  /// Stable id from the provider (PR number, commit sha, branch name) for upserts.
+  externalId String      @map("external_id")
+  title      String
+  url        String
+  /// open | merged | closed (PRs); null otherwise.
+  state      String?
+  author     String      @default("")
+  createdAt  DateTime    @default(now()) @map("created_at")
+  updatedAt  DateTime    @updatedAt @map("updated_at")
+
+  issue Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+  @@unique([issueId, kind, externalId])
+  @@map("dev_links")
+}
+
+/// One REST API call (kept 30 days) for the API usage page.
+model ApiRequestLog {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  tokenId     String?  @map("token_id")
+  method      String
+  path        String
+  status      Int
+  durationMs  Int      @map("duration_ms")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+  @@map("api_request_logs")
+}
+
+/// An upvote on the public roadmap (one per browser/email per issue).
+model RoadmapVote {
+  issueId   String   @map("issue_id")
+  voterKey  String   @map("voter_key")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  issue Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+  @@id([issueId, voterKey])
+  @@map("roadmap_votes")
+}
+
+/// Emails that want release updates from a public roadmap.
+model RoadmapSubscriber {
+  projectId String   @map("project_id")
+  email     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, email])
+  @@map("roadmap_subscribers")
 }
