@@ -17,6 +17,7 @@ export const RESERVED_WORKSPACE_SLUGS = new Set([
   "new",
   "onboarding",
   "portal",
+  "roadmap",
   "public",
   "settings",
   "sign-in",
