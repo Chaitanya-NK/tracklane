@@ -1,6 +1,6 @@
 import { deliverNotificationsJob } from "./deliver-notifications";
 import { heartbeatJob } from "./heartbeat";
-import { automationDailyJob, recurringIssuesJob } from "./planning";
+import { automationDailyJob, filterDigestsJob, recurringIssuesJob } from "./planning";
 import { deliverWebhooksJob } from "./webhooks";
 import { slaCheckJob } from "./sla";
 import { projectSnapshotsJob } from "./snapshots";
@@ -15,4 +15,5 @@ export const jobs: JobDefinition<any>[] = [
   automationDailyJob,
   recurringIssuesJob,
   deliverWebhooksJob,
+  filterDigestsJob,
 ];

@@ -15,3 +15,10 @@ export const recurringIssuesJob: JobDefinition = {
   runOnStart: true,
   handler: () => callInternal("/api/internal/recurring", "Recurring issues"),
 };
+
+/** Emails subscribed filter digests that are due (daily or weekly). Hourly. */
+export const filterDigestsJob: JobDefinition = {
+  name: "filters.digests",
+  cron: "15 * * * *",
+  handler: () => callInternal("/api/internal/filter-digests", "Filter digests"),
+};
