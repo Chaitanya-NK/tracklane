@@ -23,6 +23,18 @@ if ! grep -q "^BETTER_AUTH_SECRET=..*" .env; then
   sed -i "s#^BETTER_AUTH_SECRET=.*#BETTER_AUTH_SECRET=${secret}#" .env
 fi
 
+if ! grep -q "^VAPID_PRIVATE_KEY=..*" .env; then
+  echo "▸ Generating Web Push (VAPID) keys"
+  keys="$(node -e '
+    const ecdh = require("crypto").createECDH("prime256v1");
+    ecdh.generateKeys();
+    const priv = Buffer.alloc(32); const raw = ecdh.getPrivateKey(); raw.copy(priv, 32 - raw.length);
+    process.stdout.write(ecdh.getPublicKey().toString("base64url") + " " + priv.toString("base64url"));
+  ')"
+  sed -i "s#^NEXT_PUBLIC_VAPID_PUBLIC_KEY=.*#NEXT_PUBLIC_VAPID_PUBLIC_KEY=${keys%% *}#" .env
+  sed -i "s#^VAPID_PRIVATE_KEY=.*#VAPID_PRIVATE_KEY=${keys##* }#" .env
+fi
+
 # In Codespaces, point browser-facing URLs at the forwarded port domains.
 if [ -n "${CODESPACE_NAME:-}" ]; then
   DOMAIN="${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev}"
