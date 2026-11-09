@@ -2,6 +2,7 @@ import "server-only";
 import { AppError } from "@tracklane/core";
 import { db } from "@tracklane/db";
 import { assertWorkspacePermission } from "@/server/authz";
+import { enqueueWebhooks } from "@/server/webhooks/enqueue";
 
 const DEFAULT_SPRINT_DAYS = 14;
 const DAY = 24 * 60 * 60 * 1000;
@@ -17,7 +18,7 @@ async function loadSprint(sprintId: string) {
       state: true,
       projectId: true,
       name: true,
-      project: { select: { workspaceId: true } },
+      project: { select: { workspaceId: true, key: true } },
     },
   });
   if (!sprint) throw new AppError("not_found", "Sprint not found");
@@ -115,6 +116,17 @@ export async function startSprint(input: {
         committedPoints: points._sum.estimate ?? 0,
       },
     });
+    await enqueueWebhooks(tx, sprint.project.workspaceId, "sprint.started", {
+      sprint: {
+        id: sprint.id,
+        name: input.name,
+        goal: input.goal,
+        startDate: input.startDate,
+        endDate: input.endDate,
+        committedPoints: points._sum.estimate ?? 0,
+      },
+      project: { id: sprint.projectId, key: sprint.project.key },
+    });
   });
 }
 
@@ -168,6 +180,16 @@ export async function completeSprint(input: {
         incompleteIssues: open.length,
         completedPoints: done.reduce((sum, i) => sum + (i.estimate ?? 0), 0),
       },
+    });
+    await enqueueWebhooks(tx, sprint.project.workspaceId, "sprint.completed", {
+      sprint: {
+        id: sprint.id,
+        name: sprint.name,
+        completedIssues: done.length,
+        incompleteIssues: open.length,
+        completedPoints: done.reduce((sum, i) => sum + (i.estimate ?? 0), 0),
+      },
+      project: { id: sprint.projectId, key: sprint.project.key },
     });
     return { name: sprint.name, completed: done.length, moved: open.length };
   });

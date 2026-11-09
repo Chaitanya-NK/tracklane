@@ -4,6 +4,7 @@ import { db, Prisma } from "@tracklane/db";
 import { issueListSelect } from "@/features/issues/server";
 import { assertWorkspacePermission } from "@/server/authz";
 import { publish, rooms } from "@/server/realtime/publish";
+import { enqueueWebhooks } from "@/server/webhooks/enqueue";
 
 const day = (value: string | null) => (value ? new Date(`${value}T00:00:00Z`) : null);
 const iso = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
@@ -183,9 +184,20 @@ export async function shipRelease(
       where: { releaseId, status: { category: { not: "done" } } },
       data: { releaseId: moveOpenTo },
     });
-    await tx.release.update({
+    const shipped = await tx.release.update({
       where: { id: releaseId },
       data: { status: "released", releasedAt: new Date() },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        releasedAt: true,
+        project: { select: { id: true, key: true } },
+      },
+    });
+    await enqueueWebhooks(tx, workspaceId, "release.released", {
+      release: { ...shipped, releasedAt: shipped.releasedAt?.toISOString() ?? null },
+      movedOpenIssues: moved.count,
     });
     await publish(tx, {
       rooms: [rooms.project(workspaceId, projectId)],

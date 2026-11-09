@@ -53,6 +53,8 @@ export interface ProjectAccess extends WorkspaceAccess {
     archivedAt: Date | null;
     /** Kanban: issues in this status are in the Backlog tab, not on the board. */
     backlogStatusId: string | null;
+    portalEnabled: boolean;
+    roadmapPublic: boolean;
   };
 }
 
@@ -73,6 +75,8 @@ export const getProjectAccess = cache(
         leadId: true,
         archivedAt: true,
         backlogStatusId: true,
+        portalEnabled: true,
+        roadmapPublic: true,
       },
     });
     if (!project) notFound();

@@ -18,6 +18,12 @@ import {
   onIssueUpdated,
 } from "@/features/notifications/server/issue-events";
 import { scheduleAutomation } from "@/features/automation/server/schedule";
+import {
+  enqueueIssueEvent,
+  enqueueWebhooks,
+  issueResourceSelect,
+  toIssueResource,
+} from "@/server/webhooks/enqueue";
 import { defaultResolutionId, resolutionFields } from "@/features/resolutions/server/apply";
 import { type FieldValueInput, writeFieldValues } from "@/features/custom-fields/server/values";
 import { gateStatusChange, type StatusChange } from "@/features/workflow/server/transition";
@@ -311,6 +317,7 @@ export async function createIssue(input: CreateIssueInput) {
       values: input.fieldValues ?? {},
       creating: true,
     });
+    await enqueueIssueEvent(tx, input.workspaceId, "issue.created", issue.id);
     await tx.project.update({ where: { id: project.id }, data: { updatedAt: new Date() } });
     return { id: issue.id, key: formatIssueKey(project.key, issue.number) };
   });
@@ -489,6 +496,9 @@ async function recordChanges(tx: Tx, before: IssueRow, actorId: string, source?:
     ]);
   }
   if (changes.length) {
+    await enqueueIssueEvent(tx, after.workspaceId, "issue.updated", after.id, {
+      changes: changes.map((c) => ({ field: c.field, from: c.fromValue, to: c.toValue })),
+    });
     await tx.issueActivity.createMany({
       data: changes.map((change) => ({
         issueId: before.id,
@@ -651,13 +661,19 @@ export async function deleteIssue(input: { issueId: string; userId: string }) {
     select: {
       workspaceId: true,
       reporterId: true,
+      number: true,
       project: { select: { key: true } },
       attachments: { select: { storageKey: true } },
     },
   });
   if (!issue) throw new AppError("not_found", "Issue not found");
   await assertWorkspacePermission(issue.workspaceId, input.userId, "issues:delete");
-  await db.issue.delete({ where: { id: input.issueId } });
+  await db.$transaction(async (tx) => {
+    await enqueueWebhooks(tx, issue.workspaceId, "issue.deleted", {
+      issue: { id: input.issueId, key: formatIssueKey(issue.project.key, issue.number) },
+    });
+    await tx.issue.delete({ where: { id: input.issueId } });
+  });
   return { projectKey: issue.project.key, storageKeys: issue.attachments.map((a) => a.storageKey) };
 }
 
@@ -689,6 +705,23 @@ export async function addComment(input: {
       data: { issueId: input.issueId, actorId: input.userId, action: "commented" },
     });
     await onCommentAdded(tx, comment.issue, input.userId, input.body);
+    if (
+      await tx.webhook.count({
+        where: { workspaceId, active: true, events: { has: "comment.created" } },
+      })
+    ) {
+      const [issue, author] = await Promise.all([
+        tx.issue.findUniqueOrThrow({ where: { id: input.issueId }, select: issueResourceSelect }),
+        tx.user.findUnique({
+          where: { id: input.userId },
+          select: { id: true, name: true, email: true },
+        }),
+      ]);
+      await enqueueWebhooks(tx, workspaceId, "comment.created", {
+        comment: { id: comment.id, body: input.body, author },
+        issue: toIssueResource(issue),
+      });
+    }
     if (input.source !== "automation") {
       scheduleAutomation([
         { trigger: "comment_added", issueId: comment.issue.id, projectId: comment.issue.projectId },
