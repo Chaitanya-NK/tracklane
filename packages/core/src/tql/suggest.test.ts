@@ -15,7 +15,7 @@ describe("suggestTql", () => {
   it("suggests fields at the start and after AND", () => {
     expect(labels("")).toContain("project");
     expect(labels("sta")).toEqual(["status", "statusCategory", "start"]);
-    expect(labels("type = bug AND as")).toEqual(["assignee"]);
+    expect(labels("type = bug AND assi")).toEqual(["assignee"]);
   });
 
   it("suggests operators after a field", () => {

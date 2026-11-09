@@ -283,8 +283,18 @@ class Parser {
     if (field.values) {
       const normalized = value.value.toLowerCase().replace(/\s+/g, "_");
       if (!field.values.includes(normalized)) {
+        // A project's own issue type, kept as written (matched case-insensitively).
+        const own =
+          field.name === "type"
+            ? this.options.issueTypes?.find((n) => n.toLowerCase() === value.value.toLowerCase())
+            : undefined;
+        if (own) return { ...value, value: own };
+        const allowed = [
+          ...field.values,
+          ...(field.name === "type" ? (this.options.issueTypes ?? []) : []),
+        ];
         throw new TqlError(
-          `"${value.value}" isn't a ${field.name}. Use ${field.values.join(", ")}`,
+          `"${value.value}" isn't a ${field.name}. Use ${allowed.join(", ")}`,
           t.start,
           t.end,
         );

@@ -10,6 +10,7 @@ export type FieldKind =
   | "label"
   | "sprint"
   | "resolution"
+  | "release"
   | "issue"
   | "text"
   | "date"
@@ -143,6 +144,15 @@ export const TQL_FIELDS: FieldDef[] = [
     kind: "resolution",
     description: "How a resolved issue was closed (Fixed, Duplicate…)",
     operators: [...EQ, ...EMPTY],
+    sortable: false,
+  },
+  {
+    name: "release",
+    aliases: ["fixVersion", "version"],
+    kind: "release",
+    description: "Fix version (release name)",
+    operators: [...EQ, ...EMPTY],
+    functions: ["unreleasedVersions", "releasedVersions"],
     sortable: false,
   },
   {
@@ -297,11 +307,13 @@ export const BUILTIN_CONDITION_FUNCTIONS = [
 
 export interface TqlParseOptions {
   customFields?: readonly TqlCustomFieldSignature[];
+  /** Names of projects' own issue types, accepted by type = … alongside the built-in ones. */
+  issueTypes?: readonly string[];
   functions?: readonly TqlFunctionSignature[];
 }
 
 /** Field kinds a workspace value-list function can stand in for. */
-export const TQL_VALUE_KINDS = ["user", "label", "project", "status", "sprint"] as const;
+export const TQL_VALUE_KINDS = ["user", "label", "project", "status", "sprint", "release"] as const;
 export type TqlValueKind = (typeof TQL_VALUE_KINDS)[number];
 export const TQL_VALUE_KIND_LABELS: Record<TqlValueKind, string> = {
   user: "People (assignee, reporter, user fields)",
@@ -309,6 +321,7 @@ export const TQL_VALUE_KIND_LABELS: Record<TqlValueKind, string> = {
   project: "Projects",
   status: "Statuses",
   sprint: "Sprints",
+  release: "Releases",
 };
 
 const RESERVED_WORDS = [

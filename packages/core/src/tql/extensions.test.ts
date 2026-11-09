@@ -95,3 +95,29 @@ describe("TQL autocomplete extensions", () => {
     expect(labels('"Story points" ')).toContain(">=");
   });
 });
+
+describe("project issue types and releases", () => {
+  it("accepts a project's own type names alongside the built-in ones", () => {
+    const parsed = parseTql("type in (bug, spike)", { issueTypes: ["Spike"] });
+    expect(parsed.ok).toBe(true);
+    const bad = parseTql("type = incident", { issueTypes: ["Spike"] });
+    expect(bad.ok ? "" : bad.error.message).toContain("Spike");
+  });
+
+  it("suggests project types and release names", () => {
+    const catalog: TqlCatalog = {
+      projects: [],
+      statuses: [],
+      users: [],
+      labels: [],
+      sprints: [],
+      issueTypes: ["Spike"],
+      releases: ["2.0"],
+    };
+    const values = (q: string) => suggestTql(q, q.length, catalog).items.map((i) => i.label);
+    expect(values("type = ")).toContain("Spike");
+    expect(values("fixVersion = ")).toEqual(
+      expect.arrayContaining(["unreleasedVersions()", "2.0"]),
+    );
+  });
+});

@@ -19,6 +19,10 @@ export interface TqlCatalog {
   sprints: string[];
   /** Resolution names, for resolution = … */
   resolutions?: string[];
+  /** Release names, for release = … */
+  releases?: string[];
+  /** Projects' own issue type names, for type = … */
+  issueTypes?: string[];
   /** Custom fields across the workspace's projects. */
   customFields?: TqlCustomFieldSignature[];
   /** Workspace-defined functions (Settings → TQL functions). */
@@ -62,9 +66,14 @@ function valueSuggestions(field: FieldDef, catalog: TqlCatalog): TqlSuggestion[]
   const functions = [...(field.functions ?? []).map(fn), ...custom];
   switch (field.kind) {
     case "enum":
-      return (field.values ?? []).map((value) =>
-        v(value.replace(/_/g, " "), quote(value.replace(/_/g, " "))),
-      );
+      return [
+        ...(field.values ?? []).map((value) =>
+          v(value.replace(/_/g, " "), quote(value.replace(/_/g, " "))),
+        ),
+        ...(field.name === "type"
+          ? (catalog.issueTypes ?? []).map((t) => v(t, quote(t), "Project type"))
+          : []),
+      ];
     case "project":
       return catalog.projects.map((p) => v(p.key, p.key, p.name));
     case "status":
@@ -77,6 +86,8 @@ function valueSuggestions(field: FieldDef, catalog: TqlCatalog): TqlSuggestion[]
       return [...functions, ...catalog.sprints.map((s) => v(s))];
     case "resolution":
       return (catalog.resolutions ?? []).map((r) => v(r));
+    case "release":
+      return [...functions, ...(catalog.releases ?? []).map((r) => v(r))];
     case "option":
       return (field.custom?.options ?? []).map((o) => v(o));
     case "boolean":
