@@ -8,6 +8,7 @@ export type FieldKind =
   | "status"
   | "user"
   | "label"
+  | "component"
   | "sprint"
   | "resolution"
   | "release"
@@ -127,6 +128,22 @@ export const TQL_FIELDS: FieldDef[] = [
     kind: "label",
     description: "Label name",
     operators: [...EQ, ...EMPTY],
+    sortable: false,
+  },
+  {
+    name: "component",
+    aliases: ["components"],
+    kind: "component",
+    description: "Component name",
+    operators: [...EQ, ...EMPTY],
+    sortable: false,
+  },
+  {
+    name: "flagged",
+    aliases: ["flag"],
+    kind: "boolean",
+    description: "Flagged as blocked (true/false)",
+    operators: ["=", "!="],
     sortable: false,
   },
   {

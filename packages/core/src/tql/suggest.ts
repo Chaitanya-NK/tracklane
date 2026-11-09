@@ -16,6 +16,8 @@ export interface TqlCatalog {
   statuses: string[];
   users: { name: string; email: string }[];
   labels: string[];
+  /** Component names across projects, for component = … */
+  components?: string[];
   sprints: string[];
   /** Resolution names, for resolution = … */
   resolutions?: string[];
@@ -82,6 +84,8 @@ function valueSuggestions(field: FieldDef, catalog: TqlCatalog): TqlSuggestion[]
       return [...functions, ...catalog.users.map((u) => v(u.name, quote(u.email), u.email))];
     case "label":
       return catalog.labels.map((l) => v(l));
+    case "component":
+      return (catalog.components ?? []).map((c) => v(c));
     case "sprint":
       return [...functions, ...catalog.sprints.map((s) => v(s))];
     case "resolution":
