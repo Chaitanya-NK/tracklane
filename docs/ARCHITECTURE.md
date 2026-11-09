@@ -245,6 +245,31 @@ editable with `issues:update`.
   the facilitator reveals; `summarizeVotes` suggests the deck card nearest the median, and
   "Save & next" writes the estimate through the issue service.
 
+## API, webhooks and public pages
+
+- **REST API v1** (`app/api/v1`, `server/api`). Personal access tokens (`tl_…`, 256 bits; only
+  a SHA-256 hash is stored) per person and workspace, read-only or read & write, optionally
+  expiring. `apiHandler` authenticates, rate-limits (300 requests a minute per token, per
+  instance), maps `AppError` to status codes, and wraps results in `{ data, meta? }`. Handlers
+  call the same services as the UI, so permissions, workflow rules, automation and webhooks all
+  apply. Search is TQL. `server/api/v1/openapi.ts` is the single description: served at
+  `/api/v1/openapi.json` and rendered at `/developers`.
+- **Webhooks** (`features/webhooks`, worker `webhooks.deliver`). Services call
+  `enqueueWebhooks` inside their transaction (an outbox: rolled-back changes send nothing).
+  The worker POSTs due deliveries every minute, signed Stripe-style
+  (`X-Tracklane-Signature: t=…,v1=HMAC-SHA256("t.body")`, `signWebhook` in core), retries after
+  1, 5, 30, 120 and 360 minutes, and switches a hook off after 20 failures in a row. Targets that
+  resolve to private addresses are refused unless `WEBHOOK_ALLOW_PRIVATE_URLS=true` (dev only).
+- **Public pages** (`app/(public)`, `features/public-pages`), reachable without a session
+  (`proxy.ts` lists them):
+  - `/portal/<workspace>/<key>`: a request form when the project enables it. Requests become
+    issues filed as the project lead, rate-limited per IP with a honeypot; the requester gets a
+    private tracking link (`portal_requests.token`).
+  - `/roadmap/<workspace>/<key>`: epics as Now / Next / Later / Shipped plus upcoming
+    releases, titles and progress only.
+  - `/status/<workspace>`: components, incidents with updates, and a 30-day bar per component.
+    Admins run it from Settings → Status page.
+
 ## Search, filters and views
 
 - **TQL** (see [TQL.md](TQL.md)) is parsed in `@tracklane/core` and compiled to Prisma in

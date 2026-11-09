@@ -2,7 +2,18 @@ import { getSessionCookie } from "better-auth/cookies";
 import { type NextRequest, NextResponse } from "next/server";
 
 /** Pages reachable without signing in. Everything else needs a session cookie. */
-const PUBLIC_PATHS = ["/sign-in", "/sign-up", "/forgot-password", "/reset-password", "/invite"];
+const PUBLIC_PATHS = [
+  "/sign-in",
+  "/sign-up",
+  "/forgot-password",
+  "/reset-password",
+  "/invite",
+  // Phase 11: API reference and public pages.
+  "/developers",
+  "/portal",
+  "/roadmap",
+  "/status",
+];
 /** Auth pages a signed-in user doesn't need to see again. */
 const GUEST_ONLY_PATHS = ["/sign-in", "/sign-up"];
 

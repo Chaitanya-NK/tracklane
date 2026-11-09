@@ -5,6 +5,7 @@ import { CardSkeleton } from "@/components/shared/skeletons";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DeleteProjectDialog, LabelsManager, ProjectSettingsForm } from "@/features/projects";
 import { listAssignableUsers, listLabels } from "@/features/projects/server";
+import { PublicPagesSettings } from "@/features/public-pages";
 import { getProjectAccess } from "@/server/authz";
 
 export const metadata: Metadata = { title: "Project settings" };
@@ -48,6 +49,23 @@ async function Settings({ params }: { params: Props["params"] }) {
             labels={labels}
             canEdit={can(role, "issues:update")}
             canDelete={can(role, "projects:update")}
+          />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Public pages</CardTitle>
+          <CardDescription>
+            Pages people outside the workspace can open without signing in.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PublicPagesSettings
+            slug={slug}
+            projectKey={project.key}
+            portalEnabled={project.portalEnabled}
+            roadmapPublic={project.roadmapPublic}
+            canEdit={can(role, "projects:update")}
           />
         </CardContent>
       </Card>

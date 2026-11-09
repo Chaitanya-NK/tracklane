@@ -14,6 +14,9 @@ export function SettingsTabs() {
         { title: "Members", href: workspacePath(workspace, "settings/members") },
         { title: "TQL functions", href: workspacePath(workspace, "settings/functions") },
         { title: "Resolutions", href: workspacePath(workspace, "settings/resolutions") },
+        { title: "Status page", href: workspacePath(workspace, "settings/status") },
+        { title: "Webhooks", href: workspacePath(workspace, "settings/webhooks") },
+        { title: "API tokens", href: workspacePath(workspace, "settings/api") },
         { title: "My notifications", href: workspacePath(workspace, "settings/notifications") },
       ]}
     />
