@@ -1,5 +1,5 @@
 import "server-only";
-import { AppError, type CustomFieldType, type LabelColor } from "@tracklane/core";
+import { AppError, type CustomFieldType, findField, type LabelColor } from "@tracklane/core";
 import { db, Prisma } from "@tracklane/db";
 import { assertWorkspacePermission } from "@/server/authz";
 
@@ -22,6 +22,19 @@ async function editableProject(workspaceId: string, projectId: string, userId: s
     select: { id: true },
   });
   if (!project) throw new AppError("not_found", "Project not found");
+}
+
+/** A field named like a built-in TQL field (status, release…) couldn't be searched. */
+function checkName(name: string) {
+  if (findField(name.trim())) {
+    throw new AppError(
+      "validation_failed",
+      `${name.trim()} is a built-in field. Choose another name.`,
+      {
+        field: "name",
+      },
+    );
+  }
 }
 
 function duplicate(error: unknown, name: string): never {
@@ -60,6 +73,7 @@ export async function createField(input: {
   options: FieldOptionInput[];
 }) {
   await editableProject(input.workspaceId, input.projectId, input.userId);
+  checkName(input.name);
   const options = cleanOptions(input.type, input.options);
   const count = await db.customField.count({ where: { projectId: input.projectId } });
   if (count >= MAX_FIELDS_PER_PROJECT) {
@@ -99,6 +113,7 @@ export async function updateField(input: {
   options: FieldOptionInput[];
 }) {
   await editableProject(input.workspaceId, input.projectId, input.userId);
+  checkName(input.name);
   return db
     .$transaction(async (tx) => {
       const field = await tx.customField.findFirst({

@@ -4,4 +4,5 @@ export { IssueCard, SortableIssueCard } from "./components/issue-card";
 export { findColumn, moveItem, neighboursOf, type Columns } from "./columns";
 export { EMPTY_FILTERS, isFiltering, matchesFilters, type CardFilters } from "./filters";
 export type { BoardColumn, PlanningCard } from "./types";
+export { BlockedBadge } from "./components/blocked-badge";
 export { EpicChip } from "./components/epic-chip";

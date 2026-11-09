@@ -16,6 +16,8 @@ const card = (over: Partial<PlanningCard>): PlanningCard => ({
   labels: [],
   parent: null,
   dueDate: null,
+  customType: null,
+  blockedBy: [],
   ...over,
 });
 

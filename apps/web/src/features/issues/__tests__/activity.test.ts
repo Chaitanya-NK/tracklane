@@ -16,6 +16,7 @@ const base: IssueSnapshot = {
   sprint: null,
   resolution: null,
   timeEstimate: null,
+  release: null,
 };
 
 describe("diffIssue", () => {

@@ -26,6 +26,7 @@ const FIELD_LABELS: Record<string, string> = {
   sprint: "sprint",
   resolution: "resolution",
   timeEstimate: "time estimate",
+  release: "release",
 };
 
 function Value({ children }: { children: string | null }) {

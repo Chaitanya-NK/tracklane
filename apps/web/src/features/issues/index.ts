@@ -8,6 +8,8 @@ export { IssueDescription } from "./components/issue-description";
 export { IssueDetailsPanel } from "./components/issue-details-panel";
 export { IssueListToolbar } from "./components/issue-list-toolbar";
 export {
+  CUSTOM_TYPE_ICONS,
+  type CustomTypeDisplay,
   IssueTypeIcon,
   LabelBadge,
   LABEL_SWATCH,

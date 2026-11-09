@@ -8,6 +8,11 @@ export const planningIssueSelect = {
   position: true,
   sprintId: true,
   parent: { select: { id: true, number: true, title: true, type: true } },
+  // Open issues blocking this one.
+  linksIn: {
+    where: { type: "blocks", source: { status: { category: { not: "done" } } } },
+    select: { source: { select: { number: true, project: { select: { key: true } } } } },
+  },
 } satisfies Prisma.IssueSelect;
 
 export type PlanningIssue = Prisma.IssueGetPayload<{ select: typeof planningIssueSelect }>;

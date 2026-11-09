@@ -25,5 +25,7 @@ export function toPlanningCard(issue: PlanningIssue): PlanningCard {
         }
       : null,
     dueDate: issue.dueDate ? issue.dueDate.toISOString().slice(0, 10) : null,
+    customType: issue.customType,
+    blockedBy: issue.linksIn.map((l) => formatIssueKey(l.source.project.key, l.source.number)),
   };
 }

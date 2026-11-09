@@ -21,7 +21,7 @@ describe("compileTql", () => {
   });
 
   it("compiles equality, lists and negation", () => {
-    expect(where("type = bug")).toEqual({ type: "bug" });
+    expect(where("type = bug")).toEqual({ type: "bug", customTypeId: null });
     expect(where("status != Done")).toEqual({
       NOT: { status: { name: { equals: "Done", mode: "insensitive" } } },
     });
@@ -31,6 +31,25 @@ describe("compileTql", () => {
     expect(where("project = web")).toEqual({
       project: { OR: [{ key: "WEB" }, { name: { equals: "web", mode: "insensitive" } }] },
     });
+  });
+
+  it("compiles project issue types and releases", () => {
+    const parsed = parseTql('type = spike AND release in (unreleasedVersions(), "2.0")', {
+      issueTypes: ["Spike"],
+    });
+    if (!parsed.ok) throw new Error(parsed.error.message);
+    const result = compileTql(parsed.query, ctx);
+    if (!result.ok) throw new Error(result.message);
+    const [type, release] = (result.where as { AND: [unknown, { AND: unknown[] }] }).AND[1].AND;
+    expect(type).toEqual({ customType: { name: { equals: "Spike", mode: "insensitive" } } });
+    expect(release).toEqual({
+      OR: [
+        { release: { status: "unreleased" } },
+        { release: { name: { equals: "2.0", mode: "insensitive" } } },
+      ],
+    });
+    expect(where("fixVersion is empty")).toEqual({ releaseId: null });
+    expect(parseTql("type = spike").ok).toBe(false);
   });
 
   it("compiles users, functions and emptiness", () => {

@@ -1,5 +1,6 @@
 import {
   type CustomFieldType,
+  ISSUE_TYPES,
   parseIssueKey,
   parseTql,
   PRIORITIES,
@@ -89,6 +90,11 @@ const SPRINT_FUNCTIONS: Record<string, Where> = {
   closedSprints: { sprint: { state: "completed" } },
 };
 
+const RELEASE_FUNCTIONS: Record<string, Where> = {
+  unreleasedVersions: { release: { status: "unreleased" } },
+  releasedVersions: { release: { status: "released" } },
+};
+
 function customField(field: string, ctx: CompileContext): CompileCustomField | undefined {
   if (!field.startsWith("cf:")) return undefined;
   const def = ctx.customFields?.get(field.slice(3).toLowerCase());
@@ -144,8 +150,16 @@ function equals(field: string, value: TqlValue, ctx: CompileContext): Where {
     }
     case "key":
       return issueRef(literal(value));
-    case "type":
-      return { type: literal(value) as Prisma.EnumIssueTypeFilter["equals"] };
+    case "type": {
+      const v = literal(value);
+      // Built-in names match issues without a project type; other names are project types.
+      return (ISSUE_TYPES as readonly string[]).includes(v)
+        ? { type: v as (typeof ISSUE_TYPES)[number], customTypeId: null }
+        : { customType: { name: ci(v) } };
+    }
+    case "release":
+      if (value.kind === "function") return RELEASE_FUNCTIONS[value.name]!;
+      return { release: { name: ci(literal(value)) } };
     case "statusCategory":
       return { status: { category: literal(value) as "todo" | "in_progress" | "done" } };
     case "priority":
@@ -189,6 +203,7 @@ const EMPTY: Record<string, Where> = {
   reporter: { reporterId: null },
   labels: { labels: { none: {} } },
   sprint: { sprintId: null },
+  release: { releaseId: null },
   parent: { parentId: null },
   description: { description: "" },
   points: { estimate: null },

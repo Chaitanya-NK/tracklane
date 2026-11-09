@@ -192,6 +192,36 @@ state = pending`, so two approvers can't both decide) and then applies the statu
   `widgetSchema` on write, read defensively). Each widget renders on the server in its own
   Suspense boundary; TQL widgets run as the viewer (`currentUser()` is whoever looks).
 
+## Planning tools
+
+- **Releases** (`features/releases`). Per-project versions (unreleased → released → archived);
+  an issue's fix version is `issues.release_id`. Releasing moves open issues to another
+  unreleased version or clears it. Release notes are Markdown from `releaseNotes` in
+  `@tracklane/core/planning` (done issues grouped by type, open ones as known issues).
+- **Project issue types** (`features/issue-types`). `project_issue_types` rows with a base
+  type: the issue keeps `type` = the base (hierarchy, boards and reports are unchanged) and
+  `custom_type_id` for the name, colour and icon. Changing `type` clears `custom_type_id`;
+  pickers use `typeValue` / `parseTypeValue` (`custom:<id>`).
+- **Links** (`features/links`). `issue_links` (source, target, type): blocks, relates,
+  duplicates, clones, read from either end with `LINK_PHRASES`. Cards show **Blocked** while
+  an open issue blocks them. The Dependencies tab lays out `blocks` links with
+  `layoutDependencies` (longest-path layers; cycles are reported and not drawn).
+- **Goals** (`features/goals`). Workspace goals linked to issues; progress counts linked issues,
+  and a linked epic's children instead of the epic.
+- **Automation** (`features/automation`). Per-project rules: a trigger (issue created, status
+  changed [to …], assignee/priority changed, comment added, daily), an optional TQL condition
+  and up to 10 actions (`rules.ts`). The issue service calls `scheduleAutomation` after a change
+  commits (`after()`); the engine re-reads the issue, checks the condition with `tqlWhere`, and
+  runs the actions through the normal services as the rule's last editor, with
+  `source: "automation"` so automated changes never trigger rules again. Every run is logged
+  in `automation_runs`. Daily rules run from the worker's `automation.daily` job (06:00 UTC →
+  `POST /api/internal/automation-daily`), at most 200 issues per rule.
+- **Recurring issues** (`features/recurring`). Daily / weekly (ISO weekdays) / monthly (day,
+  clamped to the month) schedules at 00:00 UTC (`nextRun` in core). The worker's
+  `issues.recurring` job (hourly, and on start) calls `POST /api/internal/recurring`, which
+  claims each due row by advancing `next_run_at` before creating the issue, so overlapping runs
+  can't create duplicates.
+
 ## Search, filters and views
 
 - **TQL** (see [TQL.md](TQL.md)) is parsed in `@tracklane/core` and compiled to Prisma in

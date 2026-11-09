@@ -17,6 +17,7 @@ import {
   onIssueCreated,
   onIssueUpdated,
 } from "@/features/notifications/server/issue-events";
+import { scheduleAutomation } from "@/features/automation/server/schedule";
 import { defaultResolutionId, resolutionFields } from "@/features/resolutions/server/apply";
 import { type FieldValueInput, writeFieldValues } from "@/features/custom-fields/server/values";
 import { gateStatusChange, type StatusChange } from "@/features/workflow/server/transition";
@@ -38,6 +39,10 @@ const snapshotSelect = {
   startDate: true,
   estimate: true,
   timeEstimate: true,
+  releaseId: true,
+  customTypeId: true,
+  release: { select: { name: true } },
+  customType: { select: { name: true } },
   statusId: true,
   assigneeId: true,
   parentId: true,
@@ -62,7 +67,7 @@ function snapshot(issue: IssueRow): IssueSnapshot {
   return {
     title: issue.title,
     description: issue.description,
-    type: ISSUE_TYPE_LABELS[issue.type],
+    type: issue.customType?.name ?? ISSUE_TYPE_LABELS[issue.type],
     priority: PRIORITY_LABELS[issue.priority],
     status: issue.status.name,
     assignee: issue.assignee?.name ?? null,
@@ -74,6 +79,7 @@ function snapshot(issue: IssueRow): IssueSnapshot {
     sprint: issue.sprint?.name ?? null,
     resolution: issue.resolution?.name ?? null,
     timeEstimate: issue.timeEstimate === null ? null : formatDuration(issue.timeEstimate),
+    release: issue.release?.name ?? null,
   };
 }
 
@@ -94,8 +100,29 @@ async function validateReferences(
     parentId?: string | null;
     labelIds?: string[];
     sprintId?: string | null;
+    releaseId?: string | null;
+    customTypeId?: string | null;
   },
 ) {
+  if (refs.releaseId) {
+    const release = await tx.release.findFirst({
+      where: { id: refs.releaseId, projectId: ctx.projectId },
+      select: { status: true },
+    });
+    if (!release) throw new AppError("validation_failed", "That release isn't in this project");
+    if (release.status === "archived")
+      throw new AppError("validation_failed", "That release is archived");
+  }
+  if (refs.customTypeId) {
+    const custom = await tx.projectIssueType.findFirst({
+      where: { id: refs.customTypeId, projectId: ctx.projectId },
+      select: { baseType: true },
+    });
+    if (!custom) throw new AppError("validation_failed", "That issue type isn't in this project");
+    if (custom.baseType !== refs.type) {
+      throw new AppError("validation_failed", "The issue type doesn't match its base type");
+    }
+  }
   if (refs.statusId) {
     const status = await tx.workflowStatus.findFirst({
       where: { id: refs.statusId, projectId: ctx.projectId },
@@ -178,6 +205,10 @@ export interface CreateIssueInput {
   sprintId?: string | null;
   /** Custom field values by field id. Required fields must be present. */
   fieldValues?: Record<string, FieldValueInput>;
+  releaseId?: string | null;
+  customTypeId?: string | null;
+  /** Set by automation and recurring issues, so they don't trigger automation again. */
+  source?: "automation";
 }
 
 export async function createIssue(input: CreateIssueInput) {
@@ -231,6 +262,8 @@ export async function createIssue(input: CreateIssueInput) {
         startDate: input.startDate ? new Date(`${input.startDate}T00:00:00Z`) : null,
         dueDate: input.dueDate ? new Date(`${input.dueDate}T00:00:00Z`) : null,
         estimate: input.estimate ?? null,
+        releaseId: input.releaseId ?? null,
+        customTypeId: input.customTypeId ?? null,
         position: await nextPosition(tx, project.id),
         // A subtask lives in its parent's sprint unless one was given explicitly.
         sprintId:
@@ -267,6 +300,9 @@ export async function createIssue(input: CreateIssueInput) {
       },
       input.userId,
     );
+    if (input.source !== "automation") {
+      scheduleAutomation([{ trigger: "issue_created", issueId: issue.id, projectId: project.id }]);
+    }
     await writeFieldValues(tx, {
       issueId: issue.id,
       projectId: project.id,
@@ -297,6 +333,8 @@ export interface IssuePatch {
   resolutionId?: string;
   /** Original time estimate in minutes. */
   timeEstimate?: number | null;
+  releaseId?: string | null;
+  customTypeId?: string | null;
 }
 
 export async function updateIssue(input: {
@@ -305,6 +343,8 @@ export async function updateIssue(input: {
   patch: IssuePatch;
   /** Set only when applying an approved transition: the workflow gate was already passed. */
   approved?: boolean;
+  /** "automation": changes made by a rule, which don't trigger rules again. */
+  source?: "automation";
 }) {
   return db.$transaction(async (tx) => {
     const before = await loadIssue(tx, input.issueId);
@@ -329,6 +369,13 @@ export async function updateIssue(input: {
         parentId,
         labelIds: patch.labelIds,
         sprintId: patch.sprintId,
+        releaseId: patch.releaseId,
+        customTypeId:
+          patch.customTypeId !== undefined
+            ? patch.customTypeId
+            : patch.type && patch.type !== before.type
+              ? null
+              : before.customTypeId,
       },
     );
 
@@ -380,6 +427,14 @@ export async function updateIssue(input: {
         parentId: patch.parentId,
         estimate: patch.estimate,
         timeEstimate: patch.timeEstimate,
+        releaseId: patch.releaseId,
+        // Changing the base type drops a custom type of another base.
+        customTypeId:
+          patch.customTypeId !== undefined
+            ? patch.customTypeId
+            : patch.type && patch.type !== before.type
+              ? null
+              : undefined,
         startDate:
           patch.startDate === undefined
             ? undefined
@@ -404,7 +459,7 @@ export async function updateIssue(input: {
     if (patch.sprintId !== undefined && patch.sprintId !== before.sprintId) {
       await moveSubtasksWithParent(tx, before.id, patch.sprintId, input.userId);
     }
-    const changed = await recordChanges(tx, before, input.userId);
+    const changed = await recordChanges(tx, before, input.userId, input.source);
     return {
       key: formatIssueKey(before.project.key, before.number),
       changed,
@@ -415,10 +470,24 @@ export async function updateIssue(input: {
 
 /** resolvedAt follows the status category: set when entering "done", cleared when leaving it. */
 /** Writes one history row per changed field. Returns how many fields changed. */
-async function recordChanges(tx: Tx, before: IssueRow, actorId: string) {
+async function recordChanges(tx: Tx, before: IssueRow, actorId: string, source?: "automation") {
   const after = await loadIssue(tx, before.id);
   const changes = diffIssue(snapshot(before), snapshot(after));
   if (changes.length) await onIssueUpdated(tx, before, after, actorId);
+  if (changes.length && source !== "automation") {
+    const base = { issueId: after.id, projectId: after.projectId };
+    scheduleAutomation([
+      ...(after.statusId !== before.statusId
+        ? [{ trigger: "status_changed" as const, toStatusId: after.statusId, ...base }]
+        : []),
+      ...(after.assigneeId !== before.assigneeId
+        ? [{ trigger: "assignee_changed" as const, ...base }]
+        : []),
+      ...(after.priority !== before.priority
+        ? [{ trigger: "priority_changed" as const, ...base }]
+        : []),
+    ]);
+  }
   if (changes.length) {
     await tx.issueActivity.createMany({
       data: changes.map((change) => ({
@@ -603,7 +672,12 @@ async function issueWorkspace(issueId: string) {
   return issue.workspaceId;
 }
 
-export async function addComment(input: { issueId: string; userId: string; body: string }) {
+export async function addComment(input: {
+  issueId: string;
+  userId: string;
+  body: string;
+  source?: "automation";
+}) {
   const workspaceId = await issueWorkspace(input.issueId);
   await assertWorkspacePermission(workspaceId, input.userId, "comments:create");
   return db.$transaction(async (tx) => {
@@ -615,6 +689,11 @@ export async function addComment(input: { issueId: string; userId: string; body:
       data: { issueId: input.issueId, actorId: input.userId, action: "commented" },
     });
     await onCommentAdded(tx, comment.issue, input.userId, input.body);
+    if (input.source !== "automation") {
+      scheduleAutomation([
+        { trigger: "comment_added", issueId: comment.issue.id, projectId: comment.issue.projectId },
+      ]);
+    }
     return comment;
   });
 }

@@ -13,10 +13,20 @@ import {
   ChevronsDownIcon,
   ChevronsUpIcon,
   ChevronUpIcon,
+  ClipboardListIcon,
   EqualIcon,
+  FileTextIcon,
+  FlaskConicalIcon,
+  LightbulbIcon,
   ListTreeIcon,
   type LucideIcon,
+  MegaphoneIcon,
+  RocketIcon,
+  ServerIcon,
+  ShieldIcon,
   SquareCheckIcon,
+  SquareIcon,
+  WrenchIcon,
   ZapIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -31,17 +41,49 @@ const TYPE_STYLE: Record<IssueType, { icon: LucideIcon; className: string }> = {
   subtask: { icon: ListTreeIcon, className: "bg-cyan-600 text-white" },
 };
 
-/** Coloured issue-type glyph. Pass `tooltip={false}` inside menus/selects that already show the name. */
+/** Icons a project's own issue types can use (stored by name). */
+export const CUSTOM_TYPE_ICONS: Record<string, LucideIcon> = {
+  square: SquareIcon,
+  flask: FlaskConicalIcon,
+  shield: ShieldIcon,
+  rocket: RocketIcon,
+  file: FileTextIcon,
+  wrench: WrenchIcon,
+  lightbulb: LightbulbIcon,
+  megaphone: MegaphoneIcon,
+  clipboard: ClipboardListIcon,
+  server: ServerIcon,
+};
+
+/** A project's own issue type, shown in place of its base type. */
+export interface CustomTypeDisplay {
+  name: string;
+  color: string;
+  icon: string;
+}
+
+/**
+ * Coloured issue-type glyph. Pass `tooltip={false}` inside menus/selects that already show the
+ * name, and `custom` for an issue with one of the project's own types.
+ */
 export function IssueTypeIcon({
   type,
+  custom,
   className,
   tooltip = true,
 }: {
   type: IssueType;
+  custom?: CustomTypeDisplay | null;
   className?: string;
   tooltip?: boolean;
 }) {
-  const { icon: Icon, className: tone } = TYPE_STYLE[type];
+  const { icon: Icon, className: tone } = custom
+    ? {
+        icon: CUSTOM_TYPE_ICONS[custom.icon] ?? SquareIcon,
+        className: cn(LABEL_SWATCH[custom.color as LabelColor] ?? LABEL_SWATCH.gray, "text-white"),
+      }
+    : TYPE_STYLE[type];
+  const name = custom?.name ?? ISSUE_TYPE_LABELS[type];
   const glyph = (
     <span
       className={cn(
@@ -52,14 +94,14 @@ export function IssueTypeIcon({
       aria-hidden={tooltip ? undefined : true}
     >
       <Icon className="size-3" aria-hidden="true" strokeWidth={2.5} />
-      {tooltip ? <span className="sr-only">{ISSUE_TYPE_LABELS[type]}</span> : null}
+      {tooltip ? <span className="sr-only">{name}</span> : null}
     </span>
   );
   if (!tooltip) return glyph;
   return (
     <Tooltip>
       <TooltipTrigger asChild>{glyph}</TooltipTrigger>
-      <TooltipContent>{ISSUE_TYPE_LABELS[type]}</TooltipContent>
+      <TooltipContent>{name}</TooltipContent>
     </Tooltip>
   );
 }

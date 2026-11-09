@@ -51,7 +51,7 @@ export function IssueTable({
               <TableRow key={issue.id} className="group relative">
                 <TableCell>
                   <div className="flex items-center gap-2">
-                    <IssueTypeIcon type={issue.type} />
+                    <IssueTypeIcon type={issue.type} custom={issue.customType} />
                     <Link
                       href={href}
                       className="font-mono text-xs text-muted-foreground group-hover:underline after:absolute after:inset-0"

@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { IssueTypeIcon, LabelBadge, PriorityIcon } from "@/features/issues";
 import { cn } from "@/lib/utils";
 import type { PlanningCard } from "../types";
+import { BlockedBadge } from "./blocked-badge";
 import { EpicChip } from "./epic-chip";
 
 /** Board card content. The whole card links to the issue (opens the quick view). */
@@ -51,8 +52,9 @@ export function IssueCard({
           {card.title}
         </Link>
       </p>
-      {card.labels.length || card.parent ? (
+      {card.labels.length || card.parent || card.blockedBy.length ? (
         <div className="flex min-w-0 flex-wrap gap-1">
+          {card.blockedBy.length ? <BlockedBadge blockedBy={card.blockedBy} /> : null}
           {card.parent ? <EpicChip parent={card.parent} className="max-w-full" /> : null}
           {card.labels.slice(0, 3).map((label) => (
             <LabelBadge key={label.id} label={label} />
@@ -60,7 +62,7 @@ export function IssueCard({
         </div>
       ) : null}
       <div className="flex items-center gap-2">
-        <IssueTypeIcon type={card.type} />
+        <IssueTypeIcon type={card.type} custom={card.customType} />
         <span
           className={cn(
             "font-mono text-xs text-muted-foreground",

@@ -21,7 +21,7 @@ export async function loadTqlEnvironment(
   workspaceId: string,
   userId: string,
 ): Promise<TqlEnvironment> {
-  const [fields, functions, filters] = await Promise.all([
+  const [fields, functions, filters, issueTypes] = await Promise.all([
     db.customField.findMany({
       where: { project: { workspaceId, archivedAt: null } },
       orderBy: [{ name: "asc" }, { createdAt: "asc" }],
@@ -49,6 +49,12 @@ export async function loadTqlEnvironment(
       // The user's own filter wins over a shared one with the same name.
       orderBy: [{ createdAt: "asc" }],
       select: { name: true, query: true, ownerId: true },
+    }),
+    db.projectIssueType.findMany({
+      where: { project: { workspaceId, archivedAt: null } },
+      distinct: ["name"],
+      orderBy: { name: "asc" },
+      select: { name: true },
     }),
   ]);
 
@@ -99,6 +105,7 @@ export async function loadTqlEnvironment(
   const parseOptions: TqlParseOptions = {
     customFields: [...signatures.values()],
     functions: fnSignatures,
+    issueTypes: issueTypes.map((t) => t.name),
   };
   return {
     parseOptions,

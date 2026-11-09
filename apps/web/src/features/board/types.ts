@@ -15,6 +15,9 @@ export interface PlanningCard {
   labels: { id: string; name: string; color: string }[];
   parent: { id: string; key: string; title: string; type: IssueType } | null;
   dueDate: string | null;
+  customType: { name: string; color: string; icon: string } | null;
+  /** Keys of open issues blocking this one. */
+  blockedBy: string[];
 }
 
 export interface BoardColumn {

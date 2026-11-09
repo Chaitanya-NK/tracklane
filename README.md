@@ -4,7 +4,7 @@ A self-hostable, Jira-style project management platform — boards, backlogs, sp
 reports, docs, automation and a REST API — built with **Next.js 16**, **shadcn/ui**, **Prisma 7**
 and **PostgreSQL**. Everything runs on free, open-source software.
 
-> **Status:** Phase 4 (views & search) of 12. See [the roadmap](#roadmap).
+> **Status:** Phase 8 (planning tools) of 12. See [the roadmap](#roadmap).
 
 ## Run it in GitHub Codespaces (recommended)
 
@@ -103,7 +103,7 @@ Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before adding features.
 | 5   | Workflow & fields ✅        | Workflow editor, approvals, custom fields, TQL functions, swimlanes |
 | 6   | Notifications & realtime ✅ | Inbox, mentions, email, push, live updates, presence, resolutions   |
 | 7   | Reports & time ✅           | Burndown, velocity, CFD, dashboards, workload, timesheets, SLAs     |
-| 8   | Planning tools              | Releases, goals, automation, dependency graph, recurring issues     |
+| 8   | Planning tools ✅           | Releases, goals, automation, dependency graph, recurring issues     |
 | 9   | Collaboration               | Docs, diagrams as code, whiteboard, retros, planning poker          |
 | 10  | AI (Gemini free tier)       | Plain-English search, duplicate detection, release notes, assistant |
 | 11  | API & public pages          | REST API v1, webhooks, API docs, request portal, roadmap, status    |

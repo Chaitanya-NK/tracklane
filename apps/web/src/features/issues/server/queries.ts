@@ -18,6 +18,7 @@ export const issueListSelect = {
   status: { select: { id: true, name: true, category: true } },
   assignee: { select: { id: true, name: true, image: true } },
   labels: { select: { label: { select: { id: true, name: true, color: true } } } },
+  customType: { select: { name: true, color: true, icon: true } },
 } satisfies Prisma.IssueSelect;
 
 export type IssueListRow = Prisma.IssueGetPayload<{ select: typeof issueListSelect }>;
@@ -86,6 +87,9 @@ export async function getIssueByKey(workspaceId: string, issueKey: string) {
       estimate: true,
       resolvedAt: true,
       resolutionId: true,
+      releaseId: true,
+      customTypeId: true,
+      customType: { select: { name: true, color: true, icon: true } },
       workspaceId: true,
       resolution: { select: { name: true } },
       createdAt: true,

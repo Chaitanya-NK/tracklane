@@ -139,7 +139,7 @@ export function FieldsManager({
           title="No custom fields"
           description={
             canEdit
-              ? "Add fields like Team, Customer or Release to track what matters to this project."
+              ? "Add fields like Team, Customer or Severity to track what matters to this project."
               : "Project admins can add fields here."
           }
         />

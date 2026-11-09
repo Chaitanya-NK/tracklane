@@ -17,6 +17,7 @@ export interface IssueSnapshot {
   sprint: string | null;
   resolution: string | null;
   timeEstimate: string | null;
+  release: string | null;
 }
 
 export interface ActivityChange {

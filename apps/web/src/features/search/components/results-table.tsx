@@ -119,7 +119,7 @@ export function ResultsTable({
               ) : null}
               <TableCell>
                 <span className="flex items-center gap-2">
-                  <IssueTypeIcon type={issue.type} />
+                  <IssueTypeIcon type={issue.type} custom={issue.customType} />
                   <Link
                     href={`/${slug}/issues/${issue.key}` as Route}
                     className="font-mono text-xs text-muted-foreground hover:underline"

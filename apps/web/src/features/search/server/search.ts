@@ -80,42 +80,50 @@ export async function tqlWhere(input: { workspaceId: string; userId: string; que
 
 /** Real values in the workspace, for TQL autocomplete. */
 export async function getTqlCatalog(workspaceId: string, userId: string): Promise<TqlCatalog> {
-  const [projects, statuses, members, labels, sprints, resolutions, env] = await Promise.all([
-    db.project.findMany({
-      where: { workspaceId, archivedAt: null },
-      orderBy: { key: "asc" },
-      select: { key: true, name: true },
-    }),
-    db.workflowStatus.findMany({
-      where: { project: { workspaceId } },
-      distinct: ["name"],
-      orderBy: { position: "asc" },
-      select: { name: true },
-    }),
-    db.workspaceMember.findMany({
-      where: { workspaceId },
-      orderBy: { user: { name: "asc" } },
-      select: { user: { select: { name: true, email: true } } },
-    }),
-    db.label.findMany({
-      where: { project: { workspaceId } },
-      distinct: ["name"],
-      orderBy: { name: "asc" },
-      select: { name: true },
-    }),
-    db.sprint.findMany({
-      where: { project: { workspaceId } },
-      orderBy: { createdAt: "desc" },
-      take: 50,
-      select: { name: true },
-    }),
-    db.resolution.findMany({
-      where: { workspaceId },
-      orderBy: { position: "asc" },
-      select: { name: true },
-    }),
-    loadTqlEnvironment(workspaceId, userId),
-  ]);
+  const [projects, statuses, members, labels, sprints, resolutions, releases, env] =
+    await Promise.all([
+      db.project.findMany({
+        where: { workspaceId, archivedAt: null },
+        orderBy: { key: "asc" },
+        select: { key: true, name: true },
+      }),
+      db.workflowStatus.findMany({
+        where: { project: { workspaceId } },
+        distinct: ["name"],
+        orderBy: { position: "asc" },
+        select: { name: true },
+      }),
+      db.workspaceMember.findMany({
+        where: { workspaceId },
+        orderBy: { user: { name: "asc" } },
+        select: { user: { select: { name: true, email: true } } },
+      }),
+      db.label.findMany({
+        where: { project: { workspaceId } },
+        distinct: ["name"],
+        orderBy: { name: "asc" },
+        select: { name: true },
+      }),
+      db.sprint.findMany({
+        where: { project: { workspaceId } },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+        select: { name: true },
+      }),
+      db.resolution.findMany({
+        where: { workspaceId },
+        orderBy: { position: "asc" },
+        select: { name: true },
+      }),
+      db.release.findMany({
+        where: { project: { workspaceId }, status: { not: "archived" } },
+        distinct: ["name"],
+        orderBy: { createdAt: "desc" },
+        take: 50,
+        select: { name: true },
+      }),
+      loadTqlEnvironment(workspaceId, userId),
+    ]);
   return {
     customFields: [...(env.parseOptions.customFields ?? [])],
     functions: [...(env.parseOptions.functions ?? [])],
@@ -126,5 +134,7 @@ export async function getTqlCatalog(workspaceId: string, userId: string): Promis
     labels: labels.map((l) => l.name),
     sprints: sprints.map((s) => s.name),
     resolutions: resolutions.map((r) => r.name),
+    releases: releases.map((r) => r.name),
+    issueTypes: [...(env.parseOptions.issueTypes ?? [])],
   };
 }

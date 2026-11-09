@@ -50,7 +50,7 @@ export const roadmap: RoadmapPhase[] = [
   {
     phase: 8,
     title: "Planning tools",
-    summary: "Releases, goals, automation, dependencies",
+    summary: "Releases, goals, automation, dependencies, recurring issues, custom issue types",
     carryOver: ["Custom issue types per project"],
   },
   { phase: 9, title: "Collaboration", summary: "Docs, diagrams, whiteboard, retros, poker" },
@@ -59,4 +59,4 @@ export const roadmap: RoadmapPhase[] = [
   { phase: 12, title: "Hardening", summary: "Audit log, SSO, i18n, accessibility, PWA" },
 ];
 
-export const CURRENT_PHASE = 7;
+export const CURRENT_PHASE = 8;

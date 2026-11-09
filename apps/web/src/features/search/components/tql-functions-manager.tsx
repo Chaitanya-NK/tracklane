@@ -77,6 +77,7 @@ function valueHint(kind: TqlValueKind, catalog: TqlCatalog) {
     project: catalog.projects.map((p) => p.key),
     status: catalog.statuses,
     sprint: catalog.sprints,
+    release: catalog.releases ?? [],
   }[kind].slice(0, 3);
   const unit = kind === "user" ? "email or name" : kind === "project" ? "project key" : kind;
   return `One ${unit} per line${sample.length ? `, e.g. ${sample.join(", ")}` : ""}.`;
@@ -90,6 +91,7 @@ function usage(fn: Pick<TqlFunctionRow, "name" | "kind" | "valueKind">) {
     project: "project",
     status: "status",
     sprint: "sprint",
+    release: "release",
   }[fn.valueKind as TqlValueKind];
   return `${field ?? "field"} in ${fn.name}()`;
 }

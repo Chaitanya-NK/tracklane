@@ -24,13 +24,14 @@ project = WEB AND status in ("To Do", "In Progress") AND assignee = currentUser(
 | -------------------------- | ---------------------------------------- | ---------------------------------- | ----------------------------------------------------------------------------- |
 | `project`                  |                                          | `= != IN NOT IN`                   | key or name                                                                   |
 | `key`                      | `issue`, `issuekey`, `id`                | `= != IN NOT IN > >= < <=`         | `WEB-12` (comparisons stay in that project)                                   |
-| `type`                     | `issuetype`                              | `= != IN NOT IN`                   | story, task, bug, epic, subtask                                               |
+| `type`                     | `issuetype`                              | `= != IN NOT IN`                   | story, task, bug, epic, subtask, or a project's own type (`"Ops task"`)       |
 | `status`                   |                                          | `= != IN NOT IN`                   | status name                                                                   |
 | `statusCategory`           | `category`                               | `= != IN NOT IN`                   | todo, "in progress", done                                                     |
 | `priority`                 |                                          | `= != IN NOT IN > >= < <=`         | lowest … highest (`priority >= high`)                                         |
 | `assignee`, `reporter`     |                                          | `= != IN NOT IN`, `IS [NOT] EMPTY` | email, name, `currentUser()`                                                  |
 | `labels`                   | `label`                                  | `= != IN NOT IN`, `IS [NOT] EMPTY` | label name                                                                    |
 | `sprint`                   |                                          | `= != IN NOT IN`, `IS [NOT] EMPTY` | name, `openSprints()`, `activeSprint()`, `futureSprints()`, `closedSprints()` |
+| `release`                  | `fixVersion`, `version`                  | `= != IN NOT IN`, `IS [NOT] EMPTY` | release name, `unreleasedVersions()`, `releasedVersions()`                    |
 | `parent`                   | `epic`                                   | `= != IN NOT IN`, `IS [NOT] EMPTY` | issue key                                                                     |
 | `text`                     |                                          | `~ !~`                             | summary or description contains                                               |
 | `summary`                  | `title`                                  | `~ !~`                             |                                                                               |
@@ -66,6 +67,9 @@ same name and type in different projects are searched together.
 "Design doc" IS EMPTY AND type = story
 ```
 
+Built-in type names match issues that don't use a project type: `type = task` leaves out an
+"Ops task" even though it behaves like a task. Use `type in (task, "Ops task")` for both.
+
 ## Functions
 
 Built in:
@@ -78,8 +82,8 @@ Workspace admins define more under **Settings → TQL functions**:
 
 - **Conditions** stand for a whole query: `isStale()` → `statusCategory != done AND updated < -14d`.
   Use them anywhere a condition goes: `isStale() AND assignee = currentUser()`.
-- **Value lists** stand for several values of one kind (people, labels, projects, statuses or
-  sprints): `webCore()` → two emails. Use them as a value: `assignee IN webCore()`,
+- **Value lists** stand for several values of one kind (people, labels, projects, statuses,
+  sprints or releases): `webCore()` → two emails. Use them as a value: `assignee IN webCore()`,
   `assignee = webCore()` or inside a list `assignee IN (currentUser(), webCore())`.
 
 Conditions may use custom fields, other functions and `filter(…)`. Expansion stops after 5
@@ -97,6 +101,7 @@ levels, and a function or filter that refers back to itself is an error (saving 
 | `labels in (frontend, backend) AND NOT status = Done`           | Labelled and not done                            |
 | `"Team" = Growth AND isStale()`                                 | Growth's work nobody has touched in two weeks    |
 | `filter("Open bugs in Web Platform") AND assignee IN webCore()` | A saved filter, narrowed to a team               |
+| `release in unreleasedVersions() AND statusCategory != done`    | Work still open in upcoming releases             |
 
 ## Implementation
 

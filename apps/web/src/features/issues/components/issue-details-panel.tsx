@@ -3,8 +3,6 @@
 import {
   allowedTargets,
   decideTransition,
-  ISSUE_TYPE_LABELS,
-  ISSUE_TYPES,
   type IssueType,
   PRIORITIES,
   PRIORITY_LABELS,
@@ -29,20 +27,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { CustomFieldValue } from "@/features/custom-fields";
 import { setIssueFieldValueAction } from "@/features/custom-fields/server/actions";
 import { toDateInputValue } from "@/lib/format";
 import type { IssueFormOptions } from "../types";
 import { CustomFieldInput } from "./custom-field-input";
 import { AssigneePicker, LabelsPicker, ParentPicker } from "./field-pickers";
-import { IssueTypeIcon, PriorityIcon } from "./issue-meta";
+import { PriorityIcon } from "./issue-meta";
+import { parseTypeValue, TypeOptions, typeValue } from "./type-choice";
 import { ResolveDialog } from "./resolve-dialog";
 import { useIssueUpdate } from "./use-issue-update";
 
 export interface IssueDetailsValue {
   id: string;
   type: IssueType;
+  customTypeId: string | null;
+  releaseId: string | null;
   priority: Priority;
   statusId: string;
   status: { name: string; category: StatusCategory };
@@ -125,21 +125,22 @@ export function IssueDetailsPanel({
 
   const typeSelect = (
     <Select
-      value={issue.type}
-      onValueChange={(v) =>
-        save({ type: v as IssueType }, `Type changed to ${ISSUE_TYPE_LABELS[v as IssueType]}`)
-      }
-      disabled={disabled || issue.hasChildren}
+      value={typeValue(issue.type, issue.customTypeId)}
+      onValueChange={(v) => {
+        const { type, customTypeId, label } = parseTypeValue(v, options.customTypes);
+        void save({ type, customTypeId }, `Type changed to ${label}`);
+      }}
+      disabled={disabled}
     >
       <SelectTrigger id="f-type" size="sm" className="w-full border-transparent shadow-none">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {ISSUE_TYPES.map((t) => (
-          <SelectItem key={t} value={t}>
-            <IssueTypeIcon type={t} tooltip={false} /> {ISSUE_TYPE_LABELS[t]}
-          </SelectItem>
-        ))}
+        {/* With children, only types that keep the hierarchy valid (same base type). */}
+        <TypeOptions
+          customTypes={options.customTypes}
+          allow={issue.hasChildren ? (t) => t === issue.type : undefined}
+        />
       </SelectContent>
     </Select>
   );
@@ -330,16 +331,41 @@ export function IssueDetailsPanel({
         </Select>
       </Row>
       <Row label="Type" htmlFor="f-type">
-        {issue.hasChildren ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div>{typeSelect}</div>
-            </TooltipTrigger>
-            <TooltipContent>Issues with child issues can&apos;t change type</TooltipContent>
-          </Tooltip>
-        ) : (
-          typeSelect
-        )}
+        {typeSelect}
+      </Row>
+      <Row label="Fix version" htmlFor="f-release">
+        <Select
+          value={issue.releaseId ?? "none"}
+          onValueChange={(value) => {
+            const releaseId = value === "none" ? null : value;
+            const name = options.releases.find((r) => r.id === releaseId)?.name;
+            void save(
+              { releaseId },
+              releaseId ? `Fix version set to ${name}` : "Fix version cleared",
+            );
+          }}
+          disabled={disabled}
+        >
+          <SelectTrigger id="f-release" size="sm" className="w-full border-transparent shadow-none">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">None</SelectItem>
+            {issue.releaseId && !options.releases.some((r) => r.id === issue.releaseId) ? (
+              <SelectItem value={issue.releaseId} disabled>
+                Archived release
+              </SelectItem>
+            ) : null}
+            {options.releases.map((r) => (
+              <SelectItem key={r.id} value={r.id}>
+                {r.name}
+                {r.status === "released" ? (
+                  <span className="text-xs text-muted-foreground">released</span>
+                ) : null}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </Row>
       <Row label="Start date" htmlFor="f-start">
         <DatePicker

@@ -87,7 +87,7 @@ describe("compileTql extensions", () => {
             { NOT: { status: { category: "done" } } },
           ],
         },
-        { AND: [{ type: "bug" }, { NOT: { status: { category: "done" } } }] },
+        { AND: [{ type: "bug", customTypeId: null }, { NOT: { status: { category: "done" } } }] },
       ],
     });
   });

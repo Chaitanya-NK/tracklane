@@ -9,7 +9,7 @@ import { UserAvatar } from "@/components/shared/user-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { EpicChip, type PlanningCard } from "@/features/board";
+import { BlockedBadge, EpicChip, type PlanningCard } from "@/features/board";
 import { IssueTypeIcon, LabelBadge, PriorityIcon, StatusBadge } from "@/features/issues";
 import { cn } from "@/lib/utils";
 
@@ -48,7 +48,7 @@ export function BacklogRow({
       >
         <GripVerticalIcon aria-hidden="true" />
       </Button>
-      <IssueTypeIcon type={card.type} />
+      <IssueTypeIcon type={card.type} custom={card.customType} />
       <Link
         href={`/${slug}/issues/${card.key}` as Route}
         className="w-16 shrink-0 font-mono text-xs text-muted-foreground hover:underline"
@@ -64,6 +64,7 @@ export function BacklogRow({
       >
         {card.title}
       </Link>
+      {card.blockedBy.length ? <BlockedBadge blockedBy={card.blockedBy} /> : null}
       <span className="hidden shrink-0 items-center gap-1 lg:flex">
         {card.parent ? <EpicChip parent={card.parent} className="max-w-40" /> : null}
         {card.labels.slice(0, 2).map((label) => (

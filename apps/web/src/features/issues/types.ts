@@ -16,6 +16,10 @@ export interface IssueFormOptions {
   customFields: CustomFieldDef[];
   /** The workspace's resolutions, in order; the default one is flagged. */
   resolutions: { id: string; name: string; description: string; isDefault: boolean }[];
+  /** The project's own issue types. */
+  customTypes: { id: string; name: string; baseType: IssueType; color: string; icon: string }[];
+  /** Unreleased versions first, then the 10 most recent released ones. */
+  releases: { id: string; name: string; status: "unreleased" | "released" | "archived" }[];
   currentUserId: string;
   canCreate: boolean;
   canEdit: boolean;

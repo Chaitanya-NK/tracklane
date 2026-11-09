@@ -44,6 +44,8 @@ const issueFields = {
   estimate: estimateSchema,
   labelIds: z.array(z.string()).max(20),
   sprintId: z.string().nullable(),
+  customTypeId: z.string().nullable(),
+  releaseId: z.string().nullable(),
 };
 
 export const createIssueAction = authActionClient
@@ -61,6 +63,8 @@ export const createIssueAction = authActionClient
       estimate: issueFields.estimate.optional(),
       labelIds: issueFields.labelIds.optional(),
       sprintId: issueFields.sprintId.optional(),
+      customTypeId: issueFields.customTypeId.optional(),
+      releaseId: issueFields.releaseId.optional(),
       fieldValues: z.record(z.string(), fieldValueSchema).optional(),
     }),
   )

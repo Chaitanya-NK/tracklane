@@ -36,6 +36,8 @@ import { SlaChip } from "@/features/sla";
 import { slasForIssue } from "@/features/sla/server";
 import { TimeTracking, WorkLogList } from "@/features/time";
 import { getIssueTime } from "@/features/time/server";
+import { LinkedIssues } from "@/features/links";
+import { listLinks } from "@/features/links/server";
 import { getWatchState } from "@/features/notifications/server";
 import { ApprovalBanner } from "@/features/workflow";
 import { getPendingApproval } from "@/features/workflow/server";
@@ -75,30 +77,41 @@ export async function IssueView({
   if (!issue) notFound();
 
   const key = formatIssueKey(issue.project.key, issue.number);
-  const [options, comments, attachments, activity, fieldValues, approval, watch, time, slas] =
-    await Promise.all([
-      loadIssueFormOptions({
-        workspaceId: workspace.id,
-        project: issue.project,
-        role,
-        userId: user.id,
-      }),
-      listComments(issue.id),
-      listAttachments(issue.id),
-      listActivity(issue.id),
-      getIssueFieldValues(issue.id),
-      getPendingApproval(issue.id),
-      getWatchState(issue.id, user.id),
-      getIssueTime(issue.id),
-      slasForIssue({
-        id: issue.id,
-        workspaceId: issue.workspaceId,
-        projectId: issue.project.id,
-        createdAt: issue.createdAt,
-        resolvedAt: issue.resolvedAt,
-        reporterId: issue.reporter?.id ?? null,
-      }),
-    ]);
+  const [
+    options,
+    comments,
+    attachments,
+    activity,
+    fieldValues,
+    approval,
+    watch,
+    time,
+    slas,
+    links,
+  ] = await Promise.all([
+    loadIssueFormOptions({
+      workspaceId: workspace.id,
+      project: issue.project,
+      role,
+      userId: user.id,
+    }),
+    listComments(issue.id),
+    listAttachments(issue.id),
+    listActivity(issue.id),
+    getIssueFieldValues(issue.id),
+    getPendingApproval(issue.id),
+    getWatchState(issue.id, user.id),
+    getIssueTime(issue.id),
+    slasForIssue({
+      id: issue.id,
+      workspaceId: issue.workspaceId,
+      projectId: issue.project.id,
+      createdAt: issue.createdAt,
+      resolvedAt: issue.resolvedAt,
+      reporterId: issue.reporter?.id ?? null,
+    }),
+    listLinks(issue.id),
+  ]);
   const canEdit = can(role, "issues:update");
   const childLabel = issue.type === "epic" ? "Issues in this epic" : "Subtasks";
   const canHaveChildren = issue.type !== "subtask";
@@ -152,7 +165,7 @@ export async function IssueView({
                   <BreadcrumbSeparator />
                   <BreadcrumbItem>
                     <BreadcrumbPage className="flex items-center gap-1.5">
-                      <IssueTypeIcon type={issue.type} tooltip={false} />
+                      <IssueTypeIcon type={issue.type} custom={issue.customType} tooltip={false} />
                       {key}
                     </BreadcrumbPage>
                   </BreadcrumbItem>
@@ -213,6 +226,14 @@ export async function IssueView({
             </section>
           ) : null}
 
+          <LinkedIssues
+            slug={slug}
+            issueId={issue.id}
+            issueKey={key}
+            links={links}
+            canEdit={canEdit}
+          />
+
           <IssueAttachments
             issueId={issue.id}
             attachments={attachments}
@@ -264,6 +285,8 @@ export async function IssueView({
                 issue={{
                   id: issue.id,
                   type: issue.type,
+                  customTypeId: issue.customTypeId,
+                  releaseId: issue.releaseId,
                   priority: issue.priority,
                   statusId: issue.statusId,
                   status: issue.status,

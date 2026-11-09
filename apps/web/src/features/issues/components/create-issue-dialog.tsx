@@ -2,8 +2,6 @@
 
 import {
   ALLOWED_PARENT_TYPES,
-  ISSUE_TYPE_LABELS,
-  ISSUE_TYPES,
   type IssueType,
   PRIORITIES,
   PRIORITY_LABELS,
@@ -44,9 +42,10 @@ import {
 } from "../server/actions";
 import type { CustomFieldValue } from "@/features/custom-fields";
 import type { IssueFormOptions, ProjectOption } from "../types";
+import { parseTypeValue, TypeOptions, typeValue } from "./type-choice";
 import { CustomFieldInput } from "./custom-field-input";
 import { AssigneePicker, LabelsPicker, ParentPicker } from "./field-pickers";
-import { IssueTypeIcon, PriorityIcon } from "./issue-meta";
+import { PriorityIcon } from "./issue-meta";
 import { Spinner } from "@/components/ui/spinner";
 
 export interface CreateIssueDefaults {
@@ -59,6 +58,7 @@ export interface CreateIssueDefaults {
 
 interface Draft {
   type: IssueType;
+  customTypeId: string | null;
   title: string;
   description: string;
   priority: Priority;
@@ -75,6 +75,7 @@ interface Draft {
 
 const emptyDraft = (defaults: CreateIssueDefaults): Draft => ({
   type: defaults.type ?? "task",
+  customTypeId: null,
   title: "",
   description: "",
   priority: "medium",
@@ -177,6 +178,9 @@ function CreateIssueForm({
       slug,
       projectKey,
       type: draft.type,
+      customTypeId: options.customTypes.some((t) => t.id === draft.customTypeId)
+        ? draft.customTypeId
+        : null,
       title: draft.title,
       description: draft.description,
       priority: draft.priority,
@@ -200,7 +204,12 @@ function CreateIssueForm({
     });
     setCreatedCount((n) => n + 1);
     if (createAnother) {
-      setDraft((d) => ({ ...emptyDraft(defaults), type: d.type, parentId: d.parentId }));
+      setDraft((d) => ({
+        ...emptyDraft(defaults),
+        type: d.type,
+        customTypeId: d.customTypeId,
+        parentId: d.parentId,
+      }));
     } else {
       onDone();
     }
@@ -242,16 +251,18 @@ function CreateIssueForm({
             </Field>
             <Field>
               <FieldLabel htmlFor="ci-type">Issue type *</FieldLabel>
-              <Select value={draft.type} onValueChange={(v) => update("type", v as IssueType)}>
+              <Select
+                value={typeValue(draft.type, draft.customTypeId)}
+                onValueChange={(v) => {
+                  const { type, customTypeId } = parseTypeValue(v, options?.customTypes ?? []);
+                  setDraft((d) => ({ ...d, type, customTypeId }));
+                }}
+              >
                 <SelectTrigger id="ci-type" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {ISSUE_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      <IssueTypeIcon type={t} tooltip={false} /> {ISSUE_TYPE_LABELS[t]}
-                    </SelectItem>
-                  ))}
+                  <TypeOptions customTypes={options?.customTypes ?? []} />
                 </SelectContent>
               </Select>
             </Field>

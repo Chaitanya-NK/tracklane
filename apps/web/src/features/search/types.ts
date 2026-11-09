@@ -13,6 +13,7 @@ export interface SearchIssue {
   estimate: number | null;
   dueDate: string | null;
   updatedAt: string;
+  customType?: { name: string; color: string; icon: string } | null;
 }
 
 export interface FilterSummary {
