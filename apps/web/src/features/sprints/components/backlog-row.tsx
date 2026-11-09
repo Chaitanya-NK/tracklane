@@ -9,7 +9,7 @@ import { UserAvatar } from "@/components/shared/user-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import type { PlanningCard } from "@/features/board";
+import { EpicChip, type PlanningCard } from "@/features/board";
 import { IssueTypeIcon, LabelBadge, PriorityIcon, StatusBadge } from "@/features/issues";
 import { cn } from "@/lib/utils";
 
@@ -65,14 +65,7 @@ export function BacklogRow({
         {card.title}
       </Link>
       <span className="hidden shrink-0 items-center gap-1 lg:flex">
-        {card.parent ? (
-          <Badge
-            variant="outline"
-            className="h-5 max-w-40 truncate rounded px-1.5 text-violet-700 dark:text-violet-300"
-          >
-            {card.parent.title}
-          </Badge>
-        ) : null}
+        {card.parent ? <EpicChip parent={card.parent} className="max-w-40" /> : null}
         {card.labels.slice(0, 2).map((label) => (
           <LabelBadge key={label.id} label={label} />
         ))}

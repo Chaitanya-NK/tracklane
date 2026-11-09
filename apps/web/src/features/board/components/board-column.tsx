@@ -101,7 +101,11 @@ export function BoardColumn({
       ) : (
         <>
           <ColumnHeader column={column} count={cards.length} points={points} />
-          <ScrollArea className="min-h-0 flex-1">{list}</ScrollArea>
+          {/* Radix wraps content in a display:table box that grows to fit the widest card;
+              make it a block so long chips truncate inside the column. */}
+          <ScrollArea className="min-h-0 flex-1 [&_[data-slot=scroll-area-viewport]>div]:!block">
+            {list}
+          </ScrollArea>
         </>
       )}
     </section>
