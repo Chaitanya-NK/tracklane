@@ -46,6 +46,9 @@ model User {
   issuesAssigned      Issue[]                  @relation("IssueAssignee")
   issuesReported      Issue[]                  @relation("IssueReporter")
   comments            Comment[]
+  commentReactions    CommentReaction[]
+  componentsLed       ProjectComponent[]
+  sprintCapacities    SprintCapacity[]
   attachments         Attachment[]
   issueActivities     IssueActivity[]
   savedFilters        SavedFilter[]
@@ -300,6 +303,7 @@ model Project {
   pokerSessions   PokerSession[]
   portalRequests  PortalRequest[]
   views           ProjectView[]
+  components      ProjectComponent[]
   backlogStatus   WorkflowStatus?      @relation("ProjectBacklogStatus", fields: [backlogStatusId], references: [id], onDelete: SetNull)
 
   @@unique([workspaceId, key])
@@ -313,6 +317,8 @@ model WorkflowStatus {
   name      String
   category  StatusCategory
   position  Int
+  /// Most issues the board column should hold (null = no limit).
+  wipLimit  Int?           @map("wip_limit")
   createdAt DateTime       @default(now()) @map("created_at")
 
   project         Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -362,9 +368,12 @@ model Issue {
   resolvedAt   DateTime? @map("resolved_at")
   /// How it was resolved (Fixed, Duplicate…). Set while the status is a Done one.
   resolutionId String?   @map("resolution_id")
+  /// Flagged as an impediment (shown on board cards).
+  flagged      Boolean   @default(false)
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
+  components     IssueComponent[]
   workspace      Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   resolution     Resolution?       @relation(fields: [resolutionId], references: [id], onDelete: SetNull)
   watchers       IssueWatcher[]
@@ -437,15 +446,80 @@ model Comment {
   authorId  String?   @map("author_id")
   /// Markdown.
   body      String
+  /// Replies point at the top-level comment they answer.
+  parentId  String?   @map("parent_id")
   editedAt  DateTime? @map("edited_at")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
-  issue  Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
-  author User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  issue     Issue             @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  author    User?             @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  parent    Comment?          @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Comment[]         @relation("CommentReplies")
+  reactions CommentReaction[]
 
   @@index([issueId, createdAt])
+  @@index([parentId])
   @@map("comments")
+}
+
+/// An emoji reaction on a comment (one per person per emoji).
+model CommentReaction {
+  commentId String   @map("comment_id")
+  userId    String   @map("user_id")
+  emoji     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([commentId, userId, emoji])
+  @@map("comment_reactions")
+}
+
+/// A part of the product (API, Checkout…) issues can belong to.
+model ProjectComponent {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  name        String
+  description String   @default("")
+  leadId      String?  @map("lead_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  project Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  lead    User?            @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  issues  IssueComponent[]
+
+  @@unique([projectId, name])
+  @@map("project_components")
+}
+
+model IssueComponent {
+  issueId     String @map("issue_id")
+  componentId String @map("component_id")
+
+  issue     Issue            @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  component ProjectComponent @relation(fields: [componentId], references: [id], onDelete: Cascade)
+
+  @@id([issueId, componentId])
+  @@index([componentId])
+  @@map("issue_components")
+}
+
+/// A person's availability for a sprint (planned at sprint start).
+model SprintCapacity {
+  sprintId String @map("sprint_id")
+  userId   String @map("user_id")
+  /// Working days the person is away during the sprint.
+  daysOff  Int    @default(0) @map("days_off")
+  /// Points they can take on; null = derived from recent velocity.
+  points   Int?
+
+  sprint Sprint @relation(fields: [sprintId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([sprintId, userId])
+  @@map("sprint_capacities")
 }
 
 model Attachment {
@@ -515,10 +589,11 @@ model Sprint {
   createdAt        DateTime    @default(now()) @map("created_at")
   updatedAt        DateTime    @updatedAt @map("updated_at")
 
-  project   Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  issues    Issue[]
-  snapshots ProjectSnapshot[]
-  retros    Retro[]
+  project    Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  issues     Issue[]
+  snapshots  ProjectSnapshot[]
+  retros     Retro[]
+  capacities SprintCapacity[]
 
   @@index([projectId, state])
   @@map("sprints")

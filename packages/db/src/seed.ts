@@ -345,6 +345,7 @@ async function seedDemoProject(workspaceId: string, demoUserId: string) {
   await seedPhase8(workspaceId, project.id, ids, demoUserId, priya.id);
   await seedPhase9(workspaceId, project.id, demoUserId, priya.id);
   await seedPhase11(workspaceId, project.id, demoUserId);
+  await seedGapFill(project.id, demoUserId);
 
   await db.comment.createMany({
     data: [
@@ -1208,4 +1209,39 @@ async function seedSprints(projectId: string, issueIds: string[], dateIn: (days:
   });
   await db.issue.updateMany({ where: { id: { in: [issue(7)] } }, data: { sprintId: sprint3.id } });
   await db.project.update({ where: { id: projectId }, data: { sprintCounter: 3 } });
+}
+
+/** Components, a WIP limit and a flagged issue for the gap-fill features. */
+async function seedGapFill(projectId: string, demoUserId: string) {
+  if (await db.projectComponent.count({ where: { projectId } })) return;
+  const [web, api] = await Promise.all([
+    db.projectComponent.create({
+      data: {
+        projectId,
+        name: "Web app",
+        description: "The customer-facing site",
+        leadId: demoUserId,
+      },
+    }),
+    db.projectComponent.create({
+      data: { projectId, name: "API", description: "Public REST API" },
+    }),
+  ]);
+  const issues = await db.issue.findMany({
+    where: { projectId },
+    orderBy: { number: "asc" },
+    take: 6,
+    select: { id: true, number: true },
+  });
+  await db.issueComponent.createMany({
+    data: issues.map((i, n) => ({ issueId: i.id, componentId: n % 2 ? api.id : web.id })),
+  });
+  const inProgress = await db.workflowStatus.findFirst({
+    where: { projectId, category: "in_progress" },
+    orderBy: { position: "asc" },
+    select: { id: true },
+  });
+  if (inProgress) {
+    await db.workflowStatus.update({ where: { id: inProgress.id }, data: { wipLimit: 3 } });
+  }
 }
