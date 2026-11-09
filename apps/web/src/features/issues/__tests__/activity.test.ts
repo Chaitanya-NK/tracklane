@@ -15,6 +15,7 @@ const base: IssueSnapshot = {
   labels: ["auth", "web"],
   sprint: null,
   resolution: null,
+  timeEstimate: null,
 };
 
 describe("diffIssue", () => {

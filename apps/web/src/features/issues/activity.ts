@@ -16,6 +16,7 @@ export interface IssueSnapshot {
   labels: string[];
   sprint: string | null;
   resolution: string | null;
+  timeEstimate: string | null;
 }
 
 export interface ActivityChange {

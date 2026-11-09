@@ -63,6 +63,21 @@ export async function searchIssues(input: {
   return { ok: true, issues, total };
 }
 
+/** A TQL query as a Prisma filter for the user (dashboards, reports). */
+export async function tqlWhere(input: { workspaceId: string; userId: string; query: string }) {
+  const env = await loadTqlEnvironment(input.workspaceId, input.userId);
+  const parsed = parseTql(input.query, env.parseOptions);
+  if (!parsed.ok) return { ok: false as const, message: parsed.error.message };
+  const compiled = compileTql(parsed.query, {
+    workspaceId: input.workspaceId,
+    userId: input.userId,
+    now: new Date(),
+    ...env.compile,
+  });
+  if (!compiled.ok) return { ok: false as const, message: compiled.message };
+  return { ok: true as const, where: compiled.where, orderBy: compiled.orderBy };
+}
+
 /** Real values in the workspace, for TQL autocomplete. */
 export async function getTqlCatalog(workspaceId: string, userId: string): Promise<TqlCatalog> {
   const [projects, statuses, members, labels, sprints, resolutions, env] = await Promise.all([

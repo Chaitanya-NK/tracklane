@@ -80,7 +80,18 @@ export const updateIssueAction = authActionClient
   .inputSchema(
     z.object({
       issueId: z.string(),
-      patch: z.object({ ...issueFields, resolutionId: z.string() }).partial(),
+      patch: z
+        .object({
+          ...issueFields,
+          resolutionId: z.string(),
+          timeEstimate: z
+            .number()
+            .int()
+            .min(0)
+            .max(60 * 8 * 5 * 52)
+            .nullable(),
+        })
+        .partial(),
     }),
   )
   .action(async ({ parsedInput, ctx }) => {

@@ -29,7 +29,9 @@ function Notice({ title, description }: { title: string; description: string }) 
       </CardHeader>
       <CardFooter>
         <Button asChild variant="outline" className="w-full">
-          <Link href="/">Go to Tracklane</Link>
+          <Link href="/" prefetch={false}>
+            Go to Tracklane
+          </Link>
         </Button>
       </CardFooter>
     </Card>

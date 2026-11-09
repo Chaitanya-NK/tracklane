@@ -16,6 +16,7 @@ export function ProjectTabs() {
         { title: "Timeline", href: `${base}/timeline` },
         { title: "Calendar", href: `${base}/calendar` },
         { title: "Issues", href: base },
+        { title: "Reports", href: `${base}/reports` },
         { title: "Settings", href: `${base}/settings`, prefix: true },
       ]}
     />

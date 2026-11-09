@@ -14,6 +14,7 @@ export function ProjectSettingsTabs() {
         { title: "General", href: base },
         { title: "Workflow", href: `${base}/workflow` },
         { title: "Fields", href: `${base}/fields` },
+        { title: "SLAs", href: `${base}/slas` },
       ]}
     />
   );

@@ -36,7 +36,7 @@ export const primaryNav: NavItem[] = [
   { title: "Goals", segment: "goals", icon: TargetIcon, availableInPhase: 8 },
   { title: "Filters", segment: "filters", icon: FilterIcon, availableInPhase: 4 },
   { title: "Dashboards", segment: "dashboards", icon: LayoutDashboardIcon, availableInPhase: 7 },
-  { title: "Teams", segment: "teams", icon: UsersIcon, availableInPhase: 7 },
+  { title: "Team", segment: "teams", icon: UsersIcon, availableInPhase: 7 },
 ];
 
 export const secondaryNav: NavItem[] = [

@@ -42,7 +42,11 @@ export const roadmap: RoadmapPhase[] = [
     title: "Notifications & realtime",
     summary: "Inbox, mentions, watchers, email and push, live updates, presence, resolutions",
   },
-  { phase: 7, title: "Reports & time", summary: "Burndown, velocity, dashboards, SLAs" },
+  {
+    phase: 7,
+    title: "Reports & time",
+    summary: "Burndown, velocity, flow, dashboards, workload, timesheets, SLAs",
+  },
   {
     phase: 8,
     title: "Planning tools",
@@ -55,4 +59,4 @@ export const roadmap: RoadmapPhase[] = [
   { phase: 12, title: "Hardening", summary: "Audit log, SSO, i18n, accessibility, PWA" },
 ];
 
-export const CURRENT_PHASE = 6;
+export const CURRENT_PHASE = 7;

@@ -25,6 +25,7 @@ const FIELD_LABELS: Record<string, string> = {
   labels: "labels",
   sprint: "sprint",
   resolution: "resolution",
+  timeEstimate: "time estimate",
 };
 
 function Value({ children }: { children: string | null }) {
@@ -82,6 +83,12 @@ function describe(item: ActivityItem) {
       return (
         <>
           set {item.field} to <Value>{item.toValue}</Value>
+        </>
+      );
+    case "work_logged":
+      return (
+        <>
+          logged <Value>{item.toValue}</Value>
         </>
       );
     case "field_cleared":

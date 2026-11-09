@@ -9,6 +9,7 @@ import {
   type IssueType,
   PRIORITY_LABELS,
   type Priority,
+  formatDuration,
 } from "@tracklane/core";
 import { db, type Prisma } from "@tracklane/db";
 import {
@@ -36,6 +37,7 @@ const snapshotSelect = {
   dueDate: true,
   startDate: true,
   estimate: true,
+  timeEstimate: true,
   statusId: true,
   assigneeId: true,
   parentId: true,
@@ -71,6 +73,7 @@ function snapshot(issue: IssueRow): IssueSnapshot {
     labels: issue.labels.map((l) => l.label.name),
     sprint: issue.sprint?.name ?? null,
     resolution: issue.resolution?.name ?? null,
+    timeEstimate: issue.timeEstimate === null ? null : formatDuration(issue.timeEstimate),
   };
 }
 
@@ -292,6 +295,8 @@ export interface IssuePatch {
   sprintId?: string | null;
   /** Only for issues in (or moving to) a Done status; defaults to the workspace default. */
   resolutionId?: string;
+  /** Original time estimate in minutes. */
+  timeEstimate?: number | null;
 }
 
 export async function updateIssue(input: {
@@ -374,6 +379,7 @@ export async function updateIssue(input: {
         assigneeId: patch.assigneeId,
         parentId: patch.parentId,
         estimate: patch.estimate,
+        timeEstimate: patch.timeEstimate,
         startDate:
           patch.startDate === undefined
             ? undefined

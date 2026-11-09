@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { FieldSeparator } from "@/components/ui/field";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { env } from "@/env";
 import {
@@ -31,6 +32,10 @@ import { getIssueFieldValues } from "@/features/custom-fields/server";
 import { ProjectAvatar } from "@/features/projects";
 import { LiveRefresh, liveRooms, Viewers } from "@/components/shared/realtime";
 import { WatchButton } from "@/features/notifications";
+import { SlaChip } from "@/features/sla";
+import { slasForIssue } from "@/features/sla/server";
+import { TimeTracking, WorkLogList } from "@/features/time";
+import { getIssueTime } from "@/features/time/server";
 import { getWatchState } from "@/features/notifications/server";
 import { ApprovalBanner } from "@/features/workflow";
 import { getPendingApproval } from "@/features/workflow/server";
@@ -70,7 +75,7 @@ export async function IssueView({
   if (!issue) notFound();
 
   const key = formatIssueKey(issue.project.key, issue.number);
-  const [options, comments, attachments, activity, fieldValues, approval, watch] =
+  const [options, comments, attachments, activity, fieldValues, approval, watch, time, slas] =
     await Promise.all([
       loadIssueFormOptions({
         workspaceId: workspace.id,
@@ -84,6 +89,15 @@ export async function IssueView({
       getIssueFieldValues(issue.id),
       getPendingApproval(issue.id),
       getWatchState(issue.id, user.id),
+      getIssueTime(issue.id),
+      slasForIssue({
+        id: issue.id,
+        workspaceId: issue.workspaceId,
+        projectId: issue.project.id,
+        createdAt: issue.createdAt,
+        resolvedAt: issue.resolvedAt,
+        reporterId: issue.reporter?.id ?? null,
+      }),
     ]);
   const canEdit = can(role, "issues:update");
   const childLabel = issue.type === "epic" ? "Issues in this epic" : "Subtasks";
@@ -212,6 +226,7 @@ export async function IssueView({
             <TabsList>
               <TabsTrigger value="comments">Comments ({comments.length})</TabsTrigger>
               <TabsTrigger value="history">History</TabsTrigger>
+              <TabsTrigger value="worklog">Work log ({time.worklogs.length})</TabsTrigger>
             </TabsList>
             <TabsContent value="comments" className="pt-4">
               <IssueComments
@@ -225,6 +240,15 @@ export async function IssueView({
             </TabsContent>
             <TabsContent value="history" className="pt-4">
               <IssueActivity items={activity} />
+            </TabsContent>
+            <TabsContent value="worklog" className="pt-4">
+              <WorkLogList
+                issueId={issue.id}
+                issueKey={key}
+                worklogs={time.worklogs}
+                currentUserId={user.id}
+                canModerate={can(role, "comments:moderate")}
+              />
             </TabsContent>
           </Tabs>
         </div>
@@ -259,6 +283,48 @@ export async function IssueView({
                   fieldValues,
                 }}
               />
+              <FieldSeparator className="my-3" />
+              <div className="space-y-3">
+                <section aria-labelledby={`time-${issue.id}`} className="space-y-1">
+                  <h3
+                    id={`time-${issue.id}`}
+                    className="px-2 text-xs font-medium text-muted-foreground"
+                  >
+                    Time tracking
+                  </h3>
+                  <TimeTracking
+                    issueId={issue.id}
+                    issueKey={key}
+                    estimate={time.estimate}
+                    logged={time.logged}
+                    canEdit={canEdit}
+                  />
+                </section>
+                {slas.length ? (
+                  <section aria-labelledby={`sla-${issue.id}`} className="space-y-1.5 px-2">
+                    <h3
+                      id={`sla-${issue.id}`}
+                      className="text-xs font-medium text-muted-foreground"
+                    >
+                      SLAs
+                    </h3>
+                    {slas.map((sla) => (
+                      <div
+                        key={sla.policyId}
+                        className="flex flex-wrap items-center justify-between gap-2 text-sm"
+                      >
+                        <span className="min-w-0 truncate">{sla.name}</span>
+                        <SlaChip
+                          name={sla.name}
+                          state={sla.state}
+                          remainingMinutes={sla.remainingMinutes}
+                          dueAt={sla.dueAt}
+                        />
+                      </div>
+                    ))}
+                  </section>
+                ) : null}
+              </div>
             </CardContent>
           </Card>
         </aside>

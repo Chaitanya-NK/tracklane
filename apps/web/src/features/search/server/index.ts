@@ -4,6 +4,7 @@ export {
   getTqlCatalog,
   PAGE_SIZE,
   searchIssues,
+  tqlWhere,
   type SearchResult,
   type SearchRow,
 } from "./search";

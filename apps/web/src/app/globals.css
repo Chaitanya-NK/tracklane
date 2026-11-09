@@ -8,6 +8,13 @@
  * so retheming the whole app is a change in this file only.
  */
 :root {
+  /* Data viz: validated categorical order (light). Assign in order, never cycle. */
+  --viz-1: #2a78d6;
+  --viz-2: #eb6834;
+  --viz-3: #1baf7a;
+  --viz-4: #eda100;
+  --viz-5: #e87ba4;
+  --viz-reference: #8a8984;
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.141 0.005 285.823);
@@ -54,6 +61,13 @@
 }
 
 .dark {
+  /* Data viz: same hues stepped for the dark surface. */
+  --viz-1: #3987e5;
+  --viz-2: #d95926;
+  --viz-3: #199e70;
+  --viz-4: #c98500;
+  --viz-5: #d55181;
+  --viz-reference: #8f8e88;
   --background: oklch(0.141 0.005 285.823);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.21 0.006 285.885);
