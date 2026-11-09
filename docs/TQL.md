@@ -37,6 +37,7 @@ project = WEB AND status in ("To Do", "In Progress") AND assignee = currentUser(
 | `description`              |                                          | `~ !~`, `IS [NOT] EMPTY`           |                                                                               |
 | `created`, `updated`       |                                          | `= > >= < <=`                      | date                                                                          |
 | `resolved`, `due`, `start` | `resolutiondate`, `duedate`, `startdate` | `= > >= < <=`, `IS [NOT] EMPTY`    | date                                                                          |
+| `resolution`               | —                                        | `= != IN NOT IN`, `IS [NOT] EMPTY` | Fixed, Duplicate… (Settings → Resolutions)                                    |
 | `points`                   | `estimate`, `storypoints`                | `= != > >= < <=`, `IS [NOT] EMPTY` | whole number                                                                  |
 
 ## Dates

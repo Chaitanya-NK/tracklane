@@ -142,6 +142,33 @@ state = pending`, so two approvers can't both decide) and then applies the statu
 - **Kanban backlog.** `projects.backlog_status_id` takes a To do status off the board and into
   the Backlog tab.
 
+## Notifications and realtime
+
+- **Fan-out** (`features/notifications/server`). Issue services call `onIssueCreated`,
+  `onIssueUpdated` (from `recordChanges`) and `onCommentAdded` inside their transaction.
+  They add watchers (reporter, assignee, commenters, people mentioned) and call `notify`, which
+  writes one `notifications` row per recipient (never the actor) following their
+  per-type channel preferences (`DEFAULT_NOTIFICATION_CHANNELS` when unset).
+- **Mentions** are stored in Markdown as `@[Name](user:<id>)` (`MENTION_PATTERN` in core); the
+  editor offers members after `@`, the renderer shows a chip.
+- **Outbox delivery.** Rows carry `email_state` / `push_state`. The worker job
+  `notifications.deliver` (every minute) sends one digest email per person and workspace and
+  Web Push to each subscribed browser (`web-push`, VAPID keys from `.env`), then marks rows
+  sent/failed/skipped. Gone push subscriptions (404/410) are deleted.
+- **Realtime.** Services `publish()` small events with `pg_notify` inside the transaction, so
+  they're only delivered after commit. `apps/realtime` LISTENs and emits them to Socket.IO
+  rooms (`user:<id>`, `ws:<workspace>:project:<id>`, `ws:<workspace>:issue:<id>`). Browsers
+  connect through the web origin (`/api/realtime` is rewritten to the realtime server) with a
+  10-minute HMAC token from `/api/realtime-token` that lists the user's workspaces; the server
+  refuses rooms outside them (`canJoinRoom`). `<LiveRefresh rooms>` refreshes a page when
+  someone else changes something in it; `<Viewers room>` shows who else is on an issue.
+- **Resolutions** (`features/resolutions`). Workspace-configurable. `resolutionFields` stamps
+  `resolved_at` and the resolution when an issue enters a Done status (the chosen one, else the
+  default) and clears both when it leaves Done. The details panel asks with a Resolve dialog;
+  board drags and bulk edits use the default.
+- **Email verification.** Better Auth sends a confirmation link on sign-up; a banner offers
+  to resend it. `REQUIRE_EMAIL_VERIFICATION=true` blocks sign-in until confirmed.
+
 ## Search, filters and views
 
 - **TQL** (see [TQL.md](TQL.md)) is parsed in `@tracklane/core` and compiled to Prisma in

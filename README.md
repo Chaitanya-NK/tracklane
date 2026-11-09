@@ -59,6 +59,11 @@ pnpm dev              # web :3000, realtime :4001, worker
 
 Health checks: `GET /api/health` (web) and `GET :4001/health` (realtime).
 
+The browser never talks to port 4001 directly: the web app proxies `/api/realtime` to it, so
+live updates work through Codespaces port forwarding with only port 3000 open. Notification
+emails land in Mailpit (port 8025). Browser push needs the VAPID keys `setup.sh` writes to
+`.env`; turn it on per browser under **Settings → My notifications**.
+
 ## Scripts
 
 | Command                            | Description                                  |
@@ -96,7 +101,7 @@ Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before adding features.
 | 3   | Board & backlog          | Drag-and-drop board, sprints, swimlanes, quick view, shortcuts      |
 | 4   | Views & search           | List view, saved views, TQL search, calendar, timeline, ⌘K          |
 | 5   | Workflow & fields        | Workflow editor, approvals, custom fields, TQL functions, swimlanes |
-| 6   | Notifications & realtime | Inbox, email, push, live updates, presence                          |
+| 6   | Notifications & realtime | Inbox, mentions, email, push, live updates, presence, resolutions   |
 | 7   | Reports & time           | Burndown, velocity, CFD, dashboards, workload, timesheets, SLAs     |
 | 8   | Planning tools           | Releases, goals, automation, dependency graph, recurring issues     |
 | 9   | Collaboration            | Docs, diagrams as code, whiteboard, retros, planning poker          |
