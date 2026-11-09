@@ -1,9 +1,21 @@
 "use client";
 
+import { KeyRoundIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { FieldSeparator } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth-client";
 
 type Provider = "github" | "google";
@@ -27,12 +39,16 @@ function GoogleIcon() {
   );
 }
 
-const LABELS: Record<Provider, { label: string; icon: () => React.ReactElement }> = {
-  github: { label: "GitHub", icon: GitHubIcon },
-  google: { label: "Google", icon: GoogleIcon },
+const LABELS: Record<Provider, { label: string; icon: () => React.ReactElement; env: string }> = {
+  google: { label: "Google", icon: GoogleIcon, env: "GOOGLE" },
+  github: { label: "GitHub", icon: GitHubIcon, env: "GITHUB" },
 };
+const ORDER: Provider[] = ["google", "github"];
 
-/** OAuth buttons for the providers configured on the server. Renders nothing if none are. */
+/**
+ * Google, GitHub and SSO sign-in. Providers without OAuth keys on the server explain how to
+ * enable them instead of failing; SSO (SAML/OIDC) isn't available yet and says so.
+ */
 export function SocialButtons({
   providers,
   callbackUrl,
@@ -41,9 +57,11 @@ export function SocialButtons({
   callbackUrl: string;
 }) {
   const [pending, setPending] = useState<Provider | null>(null);
-  if (providers.length === 0) return null;
+  const [notConfigured, setNotConfigured] = useState<Provider | null>(null);
+  const [sso, setSso] = useState(false);
 
   async function signIn(provider: Provider) {
+    if (!providers.includes(provider)) return setNotConfigured(provider);
     setPending(provider);
     const { error } = await authClient.signIn.social({ provider, callbackURL: callbackUrl });
     if (error) {
@@ -52,10 +70,12 @@ export function SocialButtons({
     }
   }
 
+  const missing = notConfigured ? LABELS[notConfigured] : null;
+
   return (
     <div className="space-y-4">
-      <div className={providers.length > 1 ? "grid grid-cols-2 gap-3" : "grid gap-3"}>
-        {providers.map((provider) => {
+      <div className="grid grid-cols-2 gap-3">
+        {ORDER.map((provider) => {
           const { label, icon: Icon } = LABELS[provider];
           return (
             <Button
@@ -70,10 +90,72 @@ export function SocialButtons({
             </Button>
           );
         })}
+        <Button
+          type="button"
+          variant="outline"
+          className="col-span-2"
+          disabled={pending !== null}
+          onClick={() => setSso(true)}
+        >
+          <KeyRoundIcon aria-hidden="true" />
+          Sign in with SSO
+        </Button>
       </div>
       <FieldSeparator className="*:data-[slot=field-separator-content]:bg-background">
         Or continue with email
       </FieldSeparator>
+
+      <Dialog open={!!missing} onOpenChange={(open) => !open && setNotConfigured(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{missing?.label} sign-in isn&apos;t set up</DialogTitle>
+            <DialogDescription>
+              This server has no {missing?.label} OAuth app yet. Use email and password for now, or
+              ask your administrator to enable it.
+            </DialogDescription>
+          </DialogHeader>
+          <p className="rounded-md bg-muted p-3 font-mono text-xs leading-relaxed">
+            {missing?.env}_CLIENT_ID=…
+            <br />
+            {missing?.env}_CLIENT_SECRET=…
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Set these in the server&apos;s <span className="font-mono">.env</span> and restart. The
+            callback URL is{" "}
+            <span className="font-mono break-all">/api/auth/callback/{notConfigured ?? ""}</span>.
+          </p>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button>Got it</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={sso} onOpenChange={setSso}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Single sign-on is coming soon</DialogTitle>
+            <DialogDescription>
+              SAML and OIDC single sign-on (Okta, Azure AD, Google Workspace and others) isn&apos;t
+              available in Tracklane yet.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="sso-domain">Work email or company domain</Label>
+            <Input id="sso-domain" placeholder="you@company.com" disabled />
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Until then, sign in with Google, GitHub or your email. Admins can let everyone on their
+            company domain join automatically under Settings → Members.
+          </p>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button>Close</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

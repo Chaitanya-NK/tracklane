@@ -1,4 +1,6 @@
 import "server-only";
+import { rateLimit } from "@/server/rate-limit";
+import { audit } from "@/server/audit";
 import { randomBytes } from "node:crypto";
 import { AppError, formatIssueKey } from "@tracklane/core";
 import { db } from "@tracklane/db";
@@ -19,6 +21,21 @@ export async function setProjectPublicPages(
     data: input,
   });
   if (!count) throw new AppError("not_found", "Project not found");
+  const project = await db.project.findUnique({
+    where: { id: projectId },
+    select: { key: true, name: true },
+  });
+  await audit(db, {
+    workspaceId: workspaceId,
+    actor: { id: userId },
+    action: "project.public_pages_changed",
+    target: {
+      type: "project",
+      id: projectId,
+      label: project && `${project.key} · ${project.name}`,
+    },
+    metadata: input,
+  });
 }
 
 // ── Request portal ──────────────────────────────────────────────────────────
@@ -45,18 +62,9 @@ export async function getPortal(workspaceSlug: string, projectKey: string) {
   });
 }
 
-const PORTAL_WINDOW_MS = 10 * 60_000;
-const PORTAL_LIMIT = 5;
-const recent = new Map<string, number[]>();
-
 /** At most 5 requests per sender (IP) per 10 minutes, per server instance. */
 function portalRateLimit(sender: string) {
-  const now = Date.now();
-  const times = (recent.get(sender) ?? []).filter((t) => now - t < PORTAL_WINDOW_MS);
-  if (times.length >= PORTAL_LIMIT) {
-    throw new AppError("rate_limited", "Too many requests from here. Try again in a few minutes.");
-  }
-  recent.set(sender, [...times, now]);
+  rateLimit("portal", sender, { limit: 5, windowMs: 10 * 60_000 });
 }
 
 /**

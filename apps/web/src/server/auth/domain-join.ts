@@ -1,4 +1,5 @@
 import "server-only";
+import { audit } from "@/server/audit";
 import { db } from "@tracklane/db";
 
 /** Free mail providers can't be used for auto-join: anyone can get an address there. */
@@ -39,5 +40,13 @@ export async function joinByDomain(user: { id: string; email: string; emailVerif
     data: workspaces.map((w) => ({ workspaceId: w.id, userId: user.id, role: "member" as const })),
     skipDuplicates: true,
   });
+  for (const w of workspaces) {
+    await audit(db, {
+      workspaceId: w.id,
+      actor: { id: user.id },
+      action: "member.joined",
+      metadata: { via: "domain", domain },
+    });
+  }
   return count;
 }

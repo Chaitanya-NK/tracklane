@@ -1,4 +1,5 @@
 import "server-only";
+import { audit } from "@/server/audit";
 import { emailDomain, PUBLIC_EMAIL_DOMAINS } from "@/server/auth/domain-join";
 import {
   AppError,
@@ -82,6 +83,12 @@ export async function setAllowedDomain(input: {
     }
   }
   await db.workspace.update({ where: { id: input.workspaceId }, data: { allowedDomain: domain } });
+  await audit(db, {
+    workspaceId: input.workspaceId,
+    actor: { id: input.userId },
+    action: "workspace.auto_join_changed",
+    metadata: { domain },
+  });
   return { domain };
 }
 
@@ -167,6 +174,14 @@ export async function inviteMembers(input: {
     }
     invited.push({ email, url });
   }
+  if (invited.length) {
+    await audit(db, {
+      workspaceId: input.workspaceId,
+      actor: input.actor,
+      action: "member.invited",
+      metadata: { emails: invited.map((i) => i.email), role: input.role },
+    });
+  }
   return { invited, alreadyMembers };
 }
 
@@ -186,6 +201,16 @@ export async function revokeInvitation(input: {
     data: { revokedAt: new Date() },
   });
   if (count === 0) throw new AppError("not_found", "Invitation not found or already used");
+  const invitation = await db.workspaceInvitation.findUnique({
+    where: { id: input.invitationId },
+    select: { email: true },
+  });
+  await audit(db, {
+    workspaceId: input.workspaceId,
+    actor: { id: input.userId },
+    action: "member.invitation_revoked",
+    target: { type: "invitation", id: input.invitationId, label: invitation?.email },
+  });
 }
 
 export async function updateMemberRole(input: {
@@ -197,7 +222,7 @@ export async function updateMemberRole(input: {
   const actorRole = await getRole(input.workspaceId, input.actorId);
   const target = await db.workspaceMember.findFirst({
     where: { id: input.memberId, workspaceId: input.workspaceId },
-    select: { id: true, role: true, userId: true },
+    select: { id: true, role: true, userId: true, user: { select: { name: true, email: true } } },
   });
   if (!target) throw new AppError("not_found", "Member not found");
   if (target.userId === input.actorId)
@@ -213,6 +238,13 @@ export async function updateMemberRole(input: {
     throw new AppError("conflict", "A workspace needs at least one owner");
   }
   await db.workspaceMember.update({ where: { id: target.id }, data: { role: input.role } });
+  await audit(db, {
+    workspaceId: input.workspaceId,
+    actor: { id: input.actorId },
+    action: "member.role_changed",
+    target: { type: "user", id: target.userId, label: target.user.email },
+    metadata: { from: target.role, to: input.role },
+  });
 }
 
 export async function removeMember(input: {
@@ -222,7 +254,7 @@ export async function removeMember(input: {
 }) {
   const target = await db.workspaceMember.findFirst({
     where: { id: input.memberId, workspaceId: input.workspaceId },
-    select: { id: true, role: true, userId: true },
+    select: { id: true, role: true, userId: true, user: { select: { email: true } } },
   });
   if (!target) throw new AppError("not_found", "Member not found");
 
@@ -237,6 +269,13 @@ export async function removeMember(input: {
     throw new AppError("conflict", "Transfer ownership before the last owner leaves");
   }
   await db.workspaceMember.delete({ where: { id: target.id } });
+  await audit(db, {
+    workspaceId: input.workspaceId,
+    actor: { id: input.actorId },
+    action: "member.removed",
+    target: { type: "user", id: target.userId, label: target.user.email },
+    metadata: { role: target.role, left: isSelf },
+  });
 }
 
 export type InvitationStatus = "pending" | "accepted" | "revoked" | "expired";
@@ -295,6 +334,12 @@ export async function acceptInvitation(input: { token: string; user: CurrentUser
     await tx.user.update({
       where: { id: input.user.id },
       data: { lastWorkspaceId: invitation.workspace.id },
+    });
+    await audit(tx, {
+      workspaceId: invitation.workspace.id,
+      actor: input.user,
+      action: "member.joined",
+      metadata: { via: "invitation", role: invitation.role },
     });
   });
   return invitation.workspace;

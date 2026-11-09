@@ -1,4 +1,5 @@
 import "server-only";
+import { audit } from "@/server/audit";
 import { randomBytes } from "node:crypto";
 import { AppError, WEBHOOK_EVENTS, type WebhookEvent } from "@tracklane/core";
 import { db } from "@tracklane/db";
@@ -86,7 +87,14 @@ export async function createWebhook(
       secret,
       createdById: userId,
     },
-    select: { id: true },
+    select: { id: true, url: true },
+  });
+  await audit(db, {
+    workspaceId: workspaceId,
+    actor: { id: userId },
+    action: "webhook.created",
+    target: { type: "webhook", id: hook.id, label: hook.url },
+    metadata: { events: input.events },
   });
   return { id: hook.id, secret };
 }
@@ -109,6 +117,13 @@ export async function updateWebhook(
     },
   });
   if (!count) throw new AppError("not_found", "Webhook not found");
+  await audit(db, {
+    workspaceId: workspaceId,
+    actor: { id: userId },
+    action: "webhook.updated",
+    target: { type: "webhook", id, label: input.url },
+    metadata: { events: input.events, active: input.active },
+  });
 }
 
 export async function rotateWebhookSecret(workspaceId: string, userId: string, id: string) {
@@ -116,13 +131,26 @@ export async function rotateWebhookSecret(workspaceId: string, userId: string, i
   const secret = `whsec_${randomBytes(24).toString("base64url")}`;
   const { count } = await db.webhook.updateMany({ where: { id, workspaceId }, data: { secret } });
   if (!count) throw new AppError("not_found", "Webhook not found");
+  await audit(db, {
+    workspaceId: workspaceId,
+    actor: { id: userId },
+    action: "webhook.secret_rotated",
+    target: { type: "webhook", id },
+  });
   return { secret };
 }
 
 export async function deleteWebhook(workspaceId: string, userId: string, id: string) {
   await assertWorkspacePermission(workspaceId, userId, "workspace:update");
+  const hook = await db.webhook.findFirst({ where: { id, workspaceId }, select: { url: true } });
   const { count } = await db.webhook.deleteMany({ where: { id, workspaceId } });
   if (!count) throw new AppError("not_found", "Webhook not found");
+  await audit(db, {
+    workspaceId: workspaceId,
+    actor: { id: userId },
+    action: "webhook.deleted",
+    target: { type: "webhook", id, label: hook?.url },
+  });
 }
 
 /** Queues a "ping" delivery, whatever the hook subscribes to. */

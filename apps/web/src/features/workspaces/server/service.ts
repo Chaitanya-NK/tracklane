@@ -1,4 +1,5 @@
 import "server-only";
+import { audit } from "@/server/audit";
 import { AppError, DEFAULT_RESOLUTIONS, slugify } from "@tracklane/core";
 import { db, Prisma } from "@tracklane/db";
 import { assertWorkspacePermission } from "@/server/authz";
@@ -38,6 +39,12 @@ export async function createWorkspace(input: { name: string; slug?: string; user
         },
         select: { id: true, name: true, slug: true },
       });
+      await audit(tx, {
+        workspaceId: workspace.id,
+        actor: { id: input.userId },
+        action: "workspace.created",
+        target: { type: "workspace", id: workspace.id, label: workspace.name },
+      });
       await tx.user.update({
         where: { id: input.userId },
         data: { lastWorkspaceId: workspace.id },
@@ -60,11 +67,23 @@ export async function updateWorkspace(input: {
 }) {
   await assertWorkspacePermission(input.workspaceId, input.userId, "workspace:update");
   try {
-    return await db.workspace.update({
+    const before = await db.workspace.findUniqueOrThrow({
+      where: { id: input.workspaceId },
+      select: { name: true, slug: true },
+    });
+    const updated = await db.workspace.update({
       where: { id: input.workspaceId },
       data: { name: input.name, slug: input.slug },
       select: { id: true, name: true, slug: true },
     });
+    await audit(db, {
+      workspaceId: input.workspaceId,
+      actor: { id: input.userId },
+      action: "workspace.updated",
+      target: { type: "workspace", id: updated.id, label: updated.name },
+      metadata: { from: before, to: { name: updated.name, slug: updated.slug } },
+    });
+    return updated;
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       throw new AppError("conflict", "That workspace URL is already taken", { field: "slug" });

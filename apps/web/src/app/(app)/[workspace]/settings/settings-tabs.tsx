@@ -18,6 +18,8 @@ export function SettingsTabs() {
         { title: "Integrations", href: workspacePath(workspace, "settings/integrations") },
         { title: "Webhooks", href: workspacePath(workspace, "settings/webhooks") },
         { title: "API tokens", href: workspacePath(workspace, "settings/api") },
+        { title: "Audit log", href: workspacePath(workspace, "settings/audit") },
+        { title: "My account", href: workspacePath(workspace, "settings/account") },
         { title: "My notifications", href: workspacePath(workspace, "settings/notifications") },
       ]}
     />

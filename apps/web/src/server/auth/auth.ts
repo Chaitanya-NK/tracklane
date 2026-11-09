@@ -53,6 +53,11 @@ export const auth = betterAuth({
       await sendEmail(user.email, verifyEmailEmail({ name: user.name, url }));
     },
   },
+  account: {
+    // Signing in with Google/GitHub using a verified email that already has an account
+    // links it instead of failing; users can also link and unlink from Account settings.
+    accountLinking: { enabled: true, trustedProviders: ["google", "github"] },
+  },
   socialProviders: {
     ...(github ? { github } : {}),
     ...(google ? { google } : {}),
@@ -60,9 +65,21 @@ export const auth = betterAuth({
   session: {
     expiresIn: 60 * 60 * 24 * 30, // 30 days
     updateAge: 60 * 60 * 24, // refresh expiry at most once a day
-    cookieCache: { enabled: true, maxAge: 5 * 60 },
+    // Short cache so a revoked session stops working within a minute.
+    cookieCache: { enabled: true, maxAge: 60 },
   },
-  rateLimit: { enabled: env.NODE_ENV === "production", window: 60, max: 100 },
+  rateLimit: {
+    enabled: env.NODE_ENV === "production",
+    window: 60,
+    max: 100,
+    // Tighter limits where guessing or spamming is the threat.
+    customRules: {
+      "/sign-in/email": { window: 60, max: 10 },
+      "/sign-up/email": { window: 60, max: 5 },
+      "/request-password-reset": { window: 300, max: 5 },
+      "/change-password": { window: 300, max: 10 },
+    },
+  },
   databaseHooks: {
     user: {
       // Domain auto-join: verified emails on a workspace's allowed domain become members.

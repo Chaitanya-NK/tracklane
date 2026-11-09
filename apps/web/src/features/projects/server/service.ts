@@ -1,4 +1,5 @@
 import "server-only";
+import { audit } from "@/server/audit";
 import { AppError, DEFAULT_WORKFLOW, type LabelColor, type ProjectType } from "@tracklane/core";
 import { db, Prisma } from "@tracklane/db";
 import { assertWorkspacePermission } from "@/server/authz";
@@ -17,7 +18,7 @@ export async function createProject(input: {
 }) {
   await assertWorkspacePermission(input.workspaceId, input.userId, "projects:create");
   try {
-    return await db.project.create({
+    const project = await db.project.create({
       data: {
         workspaceId: input.workspaceId,
         name: input.name,
@@ -32,6 +33,14 @@ export async function createProject(input: {
       },
       select: { id: true, key: true, name: true },
     });
+    await audit(db, {
+      workspaceId: input.workspaceId,
+      actor: { id: input.userId },
+      action: "project.created",
+      target: { type: "project", id: project.id, label: `${project.key} · ${project.name}` },
+      metadata: { type: input.type },
+    });
+    return project;
   } catch (error) {
     if (isUniqueViolation(error)) {
       throw new AppError("conflict", `A project with key ${input.key} already exists`, {
@@ -58,11 +67,19 @@ export async function updateProject(input: {
     });
     if (!isMember) throw new AppError("validation_failed", "The lead must be a workspace member");
   }
-  return db.project.update({
+  const project = await db.project.update({
     where: { id: input.projectId, workspaceId: input.workspaceId },
     data: { name: input.name, description: input.description, leadId: input.leadId },
     select: { id: true, key: true, name: true },
   });
+  await audit(db, {
+    workspaceId: input.workspaceId,
+    actor: { id: input.userId },
+    action: "project.updated",
+    target: { type: "project", id: project.id, label: `${project.key} · ${project.name}` },
+    metadata: { leadId: input.leadId },
+  });
+  return project;
 }
 
 export async function deleteProject(input: {
@@ -74,7 +91,11 @@ export async function deleteProject(input: {
   await assertWorkspacePermission(input.workspaceId, input.userId, "projects:delete");
   const project = await db.project.findUniqueOrThrow({
     where: { id: input.projectId, workspaceId: input.workspaceId },
-    select: { key: true, issues: { select: { attachments: { select: { storageKey: true } } } } },
+    select: {
+      key: true,
+      name: true,
+      issues: { select: { attachments: { select: { storageKey: true } } } },
+    },
   });
   if (project.key !== input.confirmKey.trim().toUpperCase()) {
     throw new AppError("validation_failed", "Type the project key exactly to confirm", {
@@ -82,6 +103,13 @@ export async function deleteProject(input: {
     });
   }
   await db.project.delete({ where: { id: input.projectId } });
+  await audit(db, {
+    workspaceId: input.workspaceId,
+    actor: { id: input.userId },
+    action: "project.deleted",
+    target: { type: "project", id: input.projectId, label: `${project.key} · ${project.name}` },
+    metadata: { issues: project.issues.length },
+  });
   return project.issues.flatMap((issue) => issue.attachments.map((a) => a.storageKey));
 }
 

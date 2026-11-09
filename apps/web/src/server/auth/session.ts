@@ -21,9 +21,18 @@ export interface CurrentUser {
  * may read cookies but not the clock) would run Better Auth's expiry check (`new Date()`) and
  * fail with "encountered the unstable value new Date() while prerendering".
  */
-export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
+const getSession = cache(async () => {
   await connection();
-  const session = await auth.api.getSession({ headers: await headers() });
+  return auth.api.getSession({ headers: await headers() });
+});
+
+/** The id of this browser's session (for "this device" in the sessions list). */
+export async function getCurrentSessionId(): Promise<string | null> {
+  return (await getSession())?.session.id ?? null;
+}
+
+export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
+  const session = await getSession();
   if (!session) return null;
   const { id, name, email, image, emailVerified } = session.user;
   return { id, name, email, image: image ?? null, emailVerified };

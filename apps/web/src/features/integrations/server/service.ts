@@ -1,4 +1,5 @@
 import "server-only";
+import { audit } from "@/server/audit";
 import { randomBytes } from "node:crypto";
 import {
   AppError,
@@ -77,11 +78,25 @@ export async function saveGitHub(input: {
       where: { id: existing.id },
       data: { config: { ...config }, enabled: true },
     });
+    await audit(db, {
+      workspaceId: input.workspaceId,
+      actor: { id: input.userId },
+      action: "integration.updated",
+      target: { type: "integration", id: existing.id, label: `GitHub ${repo}` },
+      metadata: { autoTransition: input.autoTransition, smartCommits: input.smartCommits },
+    });
     return { secret: null };
   }
   const secret = randomBytes(24).toString("base64url");
-  await db.integration.create({
+  const created = await db.integration.create({
     data: { workspaceId: input.workspaceId, kind: "github", config: { ...config }, secret },
+    select: { id: true },
+  });
+  await audit(db, {
+    workspaceId: input.workspaceId,
+    actor: { id: input.userId },
+    action: "integration.connected",
+    target: { type: "integration", id: created.id, label: `GitHub ${repo}` },
   });
   return { secret };
 }
@@ -97,6 +112,16 @@ export async function disconnect(input: {
   } else {
     await db.webhook.deleteMany({ where: { workspaceId: input.workspaceId, format: "slack" } });
   }
+  await audit(db, {
+    workspaceId: input.workspaceId,
+    actor: { id: input.userId },
+    action: "integration.disconnected",
+    target: {
+      type: "integration",
+      id: input.kind,
+      label: input.kind === "github" ? "GitHub" : "Slack",
+    },
+  });
 }
 
 /** Posts chosen events to a Slack channel through an incoming webhook. */
@@ -132,6 +157,13 @@ export async function saveSlack(input: {
         ...(input.url ? { url: input.url.trim() } : {}),
       },
     });
+    await audit(db, {
+      workspaceId: input.workspaceId,
+      actor: { id: input.userId },
+      action: "integration.updated",
+      target: { type: "integration", id: existing.id, label: "Slack" },
+      metadata: { events },
+    });
     return;
   }
   if (!input.url)
@@ -145,6 +177,13 @@ export async function saveSlack(input: {
       secret: randomBytes(16).toString("base64url"),
       createdById: input.userId,
     },
+  });
+  await audit(db, {
+    workspaceId: input.workspaceId,
+    actor: { id: input.userId },
+    action: "integration.connected",
+    target: { type: "integration", id: "slack", label: "Slack" },
+    metadata: { events },
   });
 }
 
@@ -304,5 +343,12 @@ export async function importCsv(input: {
       });
     }
   }
+  await audit(db, {
+    workspaceId: input.workspaceId,
+    actor: { id: input.userId },
+    action: "integration.csv_imported",
+    target: { type: "project", id: project.id, label: input.projectKey },
+    metadata: { created, skipped: errors.length, total: rows.length },
+  });
   return { created, errors: errors.slice(0, 50), total: rows.length };
 }

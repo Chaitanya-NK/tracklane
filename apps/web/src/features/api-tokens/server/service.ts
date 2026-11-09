@@ -1,4 +1,5 @@
 import "server-only";
+import { audit } from "@/server/audit";
 import { AppError } from "@tracklane/core";
 import { db } from "@tracklane/db";
 import { generateApiToken } from "@/server/api/tokens";
@@ -43,7 +44,8 @@ export async function createApiToken(input: {
   if (count >= MAX_TOKENS)
     throw new AppError("conflict", `You can have at most ${MAX_TOKENS} tokens. Revoke one first.`);
   const { token, prefix, hash } = generateApiToken();
-  await db.apiToken.create({
+  const created = await db.apiToken.create({
+    select: { id: true },
     data: {
       workspaceId: input.workspaceId,
       userId: input.userId,
@@ -56,6 +58,13 @@ export async function createApiToken(input: {
         : null,
     },
   });
+  await audit(db, {
+    workspaceId: input.workspaceId,
+    actor: { id: input.userId },
+    action: "api_token.created",
+    target: { type: "api_token", id: created.id, label: `${input.name} (${prefix}…)` },
+    metadata: { scope: input.scope, expiresInDays: input.expiresInDays },
+  });
   return { token };
 }
 
@@ -65,4 +74,14 @@ export async function revokeApiToken(workspaceId: string, userId: string, tokenI
     data: { revokedAt: new Date() },
   });
   if (!count) throw new AppError("not_found", "Token not found");
+  const token = await db.apiToken.findUnique({
+    where: { id: tokenId },
+    select: { name: true, prefix: true },
+  });
+  await audit(db, {
+    workspaceId: workspaceId,
+    actor: { id: userId },
+    action: "api_token.revoked",
+    target: { type: "api_token", id: tokenId, label: token && `${token.name} (${token.prefix}…)` },
+  });
 }
