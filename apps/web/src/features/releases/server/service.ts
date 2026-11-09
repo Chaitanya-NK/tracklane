@@ -1,4 +1,6 @@
 import "server-only";
+import { after } from "next/server";
+import { notifyRoadmapSubscribers } from "@/features/public-pages/server/roadmap";
 import { AppError, formatIssueKey, releaseNotes } from "@tracklane/core";
 import { db, Prisma } from "@tracklane/db";
 import { issueListSelect } from "@/features/issues/server";
@@ -204,6 +206,7 @@ export async function shipRelease(
       event: "issue:changed",
       data: { issueId: null, actorId: userId },
     });
+    after(() => notifyRoadmapSubscribers(releaseId).catch(() => 0));
     return { moved: moved.count };
   });
 }

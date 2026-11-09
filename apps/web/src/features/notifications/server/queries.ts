@@ -1,6 +1,7 @@
 import "server-only";
 import {
   DEFAULT_NOTIFICATION_CHANNELS,
+  formatIssueKey,
   NOTIFICATION_TYPES,
   type NotificationChannels,
   type NotificationType,
@@ -9,16 +10,27 @@ import { db } from "@tracklane/db";
 
 export const INBOX_PAGE_SIZE = 50;
 
+export type InboxCategory = "all" | "mentions" | "assigned" | "watching";
+
+const CATEGORY_TYPES: Record<Exclude<InboxCategory, "all">, NotificationType[]> = {
+  mentions: ["mentioned"],
+  assigned: ["assigned"],
+  watching: ["commented", "status_changed"],
+};
+
 export async function listNotifications(input: {
   userId: string;
   workspaceId: string;
   unreadOnly: boolean;
+  category?: InboxCategory;
 }) {
+  const category = input.category ?? "all";
   return db.notification.findMany({
     where: {
       userId: input.userId,
       workspaceId: input.workspaceId,
       ...(input.unreadOnly ? { readAt: null } : {}),
+      ...(category !== "all" ? { type: { in: CATEGORY_TYPES[category] } } : {}),
     },
     orderBy: { createdAt: "desc" },
     take: INBOX_PAGE_SIZE,
@@ -31,10 +43,51 @@ export async function listNotifications(input: {
       readAt: true,
       createdAt: true,
       actor: { select: { id: true, name: true, image: true } },
+      issueId: true,
       issue: { select: { type: true } },
     },
   });
 }
+
+/** The issue behind a notification, with its latest comments, for the inbox preview pane. */
+export async function getInboxPreview(userId: string, notificationId: string) {
+  const notification = await db.notification.findFirst({
+    where: { id: notificationId, userId },
+    select: { issueId: true },
+  });
+  if (!notification?.issueId) return null;
+  const issue = await db.issue.findUnique({
+    where: { id: notification.issueId },
+    select: {
+      id: true,
+      number: true,
+      title: true,
+      type: true,
+      description: true,
+      status: { select: { name: true, category: true } },
+      assignee: { select: { name: true, image: true } },
+      project: { select: { key: true, name: true } },
+      comments: {
+        orderBy: { createdAt: "desc" },
+        take: 3,
+        select: {
+          id: true,
+          body: true,
+          createdAt: true,
+          author: { select: { name: true, image: true } },
+        },
+      },
+    },
+  });
+  if (!issue) return null;
+  return {
+    ...issue,
+    key: formatIssueKey(issue.project.key, issue.number),
+    comments: issue.comments.reverse(),
+  };
+}
+
+export type InboxPreview = NonNullable<Awaited<ReturnType<typeof getInboxPreview>>>;
 
 export type InboxItem = Awaited<ReturnType<typeof listNotifications>>[number];
 

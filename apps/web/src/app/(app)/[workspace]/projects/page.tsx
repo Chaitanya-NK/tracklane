@@ -19,8 +19,8 @@ async function CreateButton({ params }: { params: PageProps<"/[workspace]/projec
 
 async function ProjectList({ params }: { params: PageProps<"/[workspace]/projects">["params"] }) {
   const { workspace: slug } = await params;
-  const { workspace, role } = await getWorkspaceAccess(slug);
-  const projects = await listProjects(workspace.id);
+  const { workspace, role, user } = await getWorkspaceAccess(slug);
+  const projects = await listProjects(workspace.id, user.id);
   if (projects.length === 0) {
     return (
       <EmptyState

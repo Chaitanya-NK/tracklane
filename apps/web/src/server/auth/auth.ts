@@ -5,6 +5,7 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
 import { env } from "@/env";
+import { joinByDomain } from "./domain-join";
 import { authTrustedOrigins } from "./origins";
 
 const github =
@@ -62,6 +63,13 @@ export const auth = betterAuth({
     cookieCache: { enabled: true, maxAge: 5 * 60 },
   },
   rateLimit: { enabled: env.NODE_ENV === "production", window: 60, max: 100 },
+  databaseHooks: {
+    user: {
+      // Domain auto-join: verified emails on a workspace's allowed domain become members.
+      create: { after: async (user) => void (await joinByDomain(user)) },
+      update: { after: async (user) => void (await joinByDomain(user)) },
+    },
+  },
   plugins: [nextCookies()],
 });
 

@@ -1,12 +1,14 @@
 import { PackageIcon } from "lucide-react";
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getPublicRoadmap } from "@/features/public-pages/server";
+import { RoadmapSubscribe, VoteButton } from "@/features/public-pages";
+import { getChangelog, getPublicRoadmap, roadmapVotes } from "@/features/public-pages/server";
 import { formatDate } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Roadmap" };
@@ -25,6 +27,14 @@ async function Roadmap({ params }: { params: Props["params"] }) {
   const roadmap = await getPublicRoadmap(workspace, projectKey);
   if (!roadmap) notFound();
   const upcoming = roadmap.releases.filter((r) => r.status === "unreleased");
+  const ids = Object.values(roadmap.columns).flatMap((cards) => cards.map((c) => c.id));
+  const voter = (await cookies()).get("tl_voter")?.value ?? null;
+  const [votes, changelog] = await Promise.all([
+    roadmapVotes(ids, voter),
+    getChangelog(roadmap.project.id),
+  ]);
+  const byVotes = <T extends { id: string }>(cards: T[]) =>
+    [...cards].sort((a, b) => (votes.counts.get(b.id) ?? 0) - (votes.counts.get(a.id) ?? 0));
   return (
     <div className="space-y-8">
       <header className="space-y-1">
@@ -36,7 +46,8 @@ async function Roadmap({ params }: { params: Props["params"] }) {
       </header>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {COLUMNS.map((col) => {
-          const cards = roadmap.columns[col.id];
+          const cards =
+            col.id === "shipped" ? roadmap.columns[col.id] : byVotes(roadmap.columns[col.id]);
           return (
             <section
               key={col.id}
@@ -58,8 +69,18 @@ async function Roadmap({ params }: { params: Props["params"] }) {
                     return (
                       <li key={c.id}>
                         <Card className="gap-3 py-4">
-                          <CardHeader className="px-4">
+                          <CardHeader className="flex items-start justify-between gap-2 px-4">
                             <CardTitle className="text-sm leading-snug">{c.title}</CardTitle>
+                            {col.id !== "shipped" ? (
+                              <VoteButton
+                                slug={workspace}
+                                projectKey={projectKey}
+                                issueId={c.id}
+                                title={c.title}
+                                count={votes.counts.get(c.id) ?? 0}
+                                voted={votes.mine.has(c.id)}
+                              />
+                            ) : null}
                           </CardHeader>
                           <CardContent className="space-y-2 px-4">
                             {col.id !== "shipped" ? (
@@ -112,6 +133,47 @@ async function Roadmap({ params }: { params: Props["params"] }) {
           </ul>
         </section>
       ) : null}
+      <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+        <section className="space-y-3" aria-labelledby="changelog">
+          <h2 id="changelog" className="text-lg font-semibold">
+            Changelog
+          </h2>
+          {changelog.length ? (
+            <ol className="space-y-4 border-l pl-4">
+              {changelog.map((r) => (
+                <li key={r.id} className="space-y-1">
+                  <p className="font-medium">
+                    {r.name}{" "}
+                    {r.releasedAt ? (
+                      <span className="text-sm font-normal text-muted-foreground">
+                        {formatDate(r.releasedAt)}
+                      </span>
+                    ) : null}
+                  </p>
+                  {r.description ? (
+                    <p className="text-sm text-muted-foreground">{r.description}</p>
+                  ) : null}
+                  {r.items.length ? (
+                    <ul className="list-disc space-y-0.5 pl-5 text-sm">
+                      {r.items.map((item, i) => (
+                        <li key={i}>{item}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="text-sm text-muted-foreground">No releases shipped yet.</p>
+          )}
+        </section>
+        <section className="space-y-3 rounded-xl border p-4" aria-labelledby="subscribe">
+          <h2 id="subscribe" className="font-semibold">
+            Get release updates
+          </h2>
+          <RoadmapSubscribe slug={workspace} projectKey={projectKey} />
+        </section>
+      </div>
     </div>
   );
 }

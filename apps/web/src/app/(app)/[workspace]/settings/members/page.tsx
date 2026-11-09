@@ -2,7 +2,14 @@ import { can, invitableRoles } from "@tracklane/core";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { HeadingSkeleton, TableSkeleton } from "@/components/shared/skeletons";
-import { InvitationsTable, InviteMembersDialog, MembersTable } from "@/features/members";
+import {
+  DomainAutoJoin,
+  InvitationsTable,
+  InviteMembersDialog,
+  MembersTable,
+  PermissionsMatrix,
+} from "@/features/members";
+import { db } from "@tracklane/db";
 import { listMembers, listPendingInvitations } from "@/features/members/server";
 import { getWorkspaceAccess } from "@/server/authz";
 
@@ -16,9 +23,10 @@ async function MembersSettings({
   const { workspace: slug } = await params;
   const { user, workspace, role } = await getWorkspaceAccess(slug);
   const canInvite = can(role, "members:invite");
-  const [members, invitations] = await Promise.all([
+  const [members, invitations, settings] = await Promise.all([
     listMembers(workspace.id, user.id),
     canInvite ? listPendingInvitations(workspace.id, user.id) : Promise.resolve([]),
+    db.workspace.findUnique({ where: { id: workspace.id }, select: { allowedDomain: true } }),
   ]);
 
   return (
@@ -45,10 +53,21 @@ async function MembersSettings({
             id: m.id,
             role: m.role,
             joinedAt: m.createdAt.toISOString(),
+            lastActiveAt: m.lastActiveAt?.toISOString() ?? null,
             user: m.user,
           }))}
         />
       </section>
+
+      {can(role, "workspace:update") ? (
+        <DomainAutoJoin
+          slug={workspace.slug}
+          domain={settings?.allowedDomain ?? null}
+          suggestion={user.email.split("@").at(-1) ?? ""}
+        />
+      ) : null}
+
+      <PermissionsMatrix />
 
       {canInvite && invitations.length > 0 ? (
         <section className="space-y-3">

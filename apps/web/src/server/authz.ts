@@ -2,6 +2,7 @@ import "server-only";
 import { AppError, can, type Permission, type WorkspaceRole } from "@tracklane/core";
 import { db } from "@tracklane/db";
 import { notFound } from "next/navigation";
+import { after } from "next/server";
 import { cache } from "react";
 import { requireUser, type CurrentUser } from "./auth";
 
@@ -19,9 +20,22 @@ export const getWorkspaceAccess = cache(async (slug: string): Promise<WorkspaceA
   const user = await requireUser();
   const membership = await db.workspaceMember.findFirst({
     where: { userId: user.id, workspace: { slug } },
-    select: { role: true, workspace: { select: { id: true, name: true, slug: true } } },
+    select: {
+      id: true,
+      role: true,
+      lastActiveAt: true,
+      workspace: { select: { id: true, name: true, slug: true } },
+    },
   });
   if (!membership) notFound();
+  // "Last active" on the members page; written at most every 5 minutes.
+  if (!membership.lastActiveAt || Date.now() - membership.lastActiveAt.getTime() > 5 * 60_000) {
+    after(() =>
+      db.workspaceMember
+        .update({ where: { id: membership.id }, data: { lastActiveAt: new Date() } })
+        .catch(() => undefined),
+    );
+  }
   return { user, workspace: membership.workspace, role: membership.role };
 });
 

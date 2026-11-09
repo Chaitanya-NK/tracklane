@@ -39,7 +39,7 @@ function Value({ children }: { children: string | null }) {
   );
 }
 
-function describe(item: ActivityItem) {
+export function describeActivity(item: ActivityItem) {
   switch (item.action) {
     case "created":
       return <>created the issue</>;
@@ -152,7 +152,7 @@ export function IssueActivity({
             <UserAvatar user={entry.item.actor ?? { name: "?" }} className="mt-0.5 size-6" />
             <p className="leading-6">
               <span className="font-medium">{entry.item.actor?.name ?? "Former member"}</span>{" "}
-              {describe(entry.item)} <span className="text-muted-foreground">· </span>
+              {describeActivity(entry.item)} <span className="text-muted-foreground">· </span>
               <TimeAgo date={entry.item.createdAt} className="text-muted-foreground" />
             </p>
           </li>

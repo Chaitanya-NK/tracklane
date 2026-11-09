@@ -1,4 +1,5 @@
 import "server-only";
+import { emailDomain, PUBLIC_EMAIL_DOMAINS } from "@/server/auth/domain-join";
 import {
   AppError,
   canAssignRole,
@@ -42,9 +43,46 @@ export async function listMembers(workspaceId: string, userId: string) {
       id: true,
       role: true,
       createdAt: true,
+      lastActiveAt: true,
       user: { select: { id: true, name: true, email: true, image: true } },
     },
   });
+}
+
+/** The domain whose verified sign-ups join automatically (null = off). */
+export async function setAllowedDomain(input: {
+  workspaceId: string;
+  userId: string;
+  domain: string | null;
+}) {
+  await assertWorkspacePermission(input.workspaceId, input.userId, "workspace:update");
+  const domain = input.domain?.trim().toLowerCase().replace(/^@/, "") || null;
+  if (domain) {
+    if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(domain)) {
+      throw new AppError("validation_failed", "Enter a domain like acme.com", { field: "domain" });
+    }
+    if (PUBLIC_EMAIL_DOMAINS.has(domain)) {
+      throw new AppError(
+        "validation_failed",
+        "Public email providers can't be used for auto-join",
+        {
+          field: "domain",
+        },
+      );
+    }
+    const user = await db.user.findUnique({ where: { id: input.userId }, select: { email: true } });
+    if (user && emailDomain(user.email) !== domain) {
+      throw new AppError(
+        "validation_failed",
+        `Use your own email's domain (${emailDomain(user.email)})`,
+        {
+          field: "domain",
+        },
+      );
+    }
+  }
+  await db.workspace.update({ where: { id: input.workspaceId }, data: { allowedDomain: domain } });
+  return { domain };
 }
 
 export async function listPendingInvitations(workspaceId: string, userId: string) {

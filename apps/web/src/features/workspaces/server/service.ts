@@ -95,3 +95,17 @@ export async function deleteWorkspace(input: {
 export async function rememberLastWorkspace(userId: string, workspaceId: string) {
   await db.user.update({ where: { id: userId }, data: { lastWorkspaceId: workspaceId } });
 }
+
+/** Onboarding answers; used to pick sensible defaults (e.g. the first project's template). */
+export async function setWorkspaceProfile(input: {
+  workspaceId: string;
+  userId: string;
+  teamSize: string;
+  useCases: string[];
+}) {
+  await assertWorkspacePermission(input.workspaceId, input.userId, "workspace:update");
+  await db.workspace.update({
+    where: { id: input.workspaceId },
+    data: { teamSize: input.teamSize, useCases: input.useCases },
+  });
+}

@@ -40,3 +40,10 @@ export async function getDefaultWorkspaceSlug(userId: string): Promise<string | 
   });
   return first?.workspace.slug ?? null;
 }
+
+export async function getWorkspaceProfile(workspaceId: string) {
+  return db.workspace.findUniqueOrThrow({
+    where: { id: workspaceId },
+    select: { teamSize: true, useCases: true },
+  });
+}

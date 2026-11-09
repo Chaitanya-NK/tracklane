@@ -1,7 +1,7 @@
 import "server-only";
 import { AppError, can, isAppError, type Permission, type WorkspaceRole } from "@tracklane/core";
 import { db } from "@tracklane/db";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import type { z } from "zod";
 import { hashApiToken } from "./tokens";
 
@@ -121,14 +121,29 @@ export function apiHandler<P>(
 ) {
   return async (request: Request, route: { params: Promise<P> }) => {
     let limitHeaders: Record<string, string> = {};
+    const started = performance.now();
+    let logged: { workspaceId: string; tokenId: string } | null = null;
+    const log = (status: number) => {
+      if (!logged) return;
+      const entry = {
+        ...logged,
+        method: request.method,
+        path: new URL(request.url).pathname.replace(/^\/api\/v1/, "").slice(0, 200) || "/",
+        status,
+        durationMs: Math.round(performance.now() - started),
+      };
+      after(() => db.apiRequestLog.create({ data: entry }).catch(() => undefined));
+    };
     try {
       const ctx = await authenticate(request);
+      logged = { workspaceId: ctx.workspace.id, tokenId: ctx.tokenId };
       limitHeaders = {
         "x-ratelimit-limit": String(LIMIT),
         "x-ratelimit-remaining": String(ctx.limit.remaining),
         "x-ratelimit-reset": String(Math.ceil(ctx.limit.reset / 1000)),
       };
       const result = await handler(request, ctx, await route.params);
+      log(result.status ?? 200);
       if (result.status === 204)
         return new NextResponse(null, { status: 204, headers: { ...CORS, ...limitHeaders } });
       return NextResponse.json(
@@ -137,12 +152,14 @@ export function apiHandler<P>(
       );
     } catch (error) {
       if (isAppError(error)) {
+        log(error.httpStatus);
         return NextResponse.json(
           { error: error.toJSON() },
           { status: error.httpStatus, headers: { ...CORS, ...limitHeaders } },
         );
       }
       console.error("API error", error);
+      log(500);
       return NextResponse.json(
         { error: { code: "internal", message: "Something went wrong" } },
         { status: 500, headers: CORS },

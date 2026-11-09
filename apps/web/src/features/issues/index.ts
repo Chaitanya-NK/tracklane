@@ -1,7 +1,7 @@
 export { CreateIssueButton } from "./components/create-issue-button";
 export { CreateIssueProvider, useCreateIssue } from "./components/create-issue-provider";
 export { IssueActionsMenu } from "./components/issue-actions-menu";
-export { IssueActivity } from "./components/issue-activity";
+export { type ActivityItem, describeActivity, IssueActivity } from "./components/issue-activity";
 export { IssueAttachments } from "./components/issue-attachments";
 export { IssueComments } from "./components/issue-comments";
 export { IssueDescription } from "./components/issue-description";
@@ -30,3 +30,4 @@ export {
   IssueQuickViewHeaderFallback,
   IssueQuickViewSheet,
 } from "./components/issue-quick-view-sheet";
+export { StarButton } from "./components/star-button";

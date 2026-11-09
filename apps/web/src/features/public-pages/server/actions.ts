@@ -1,10 +1,12 @@
 "use server";
 
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { refresh } from "next/cache";
 import { z } from "zod";
+import { env } from "@/env";
 import { getProjectAccess, getWorkspaceAccess } from "@/server/authz";
 import { actionClient, authActionClient } from "@/server/safe-action";
+import { subscribeToRoadmap, toggleVote } from "./roadmap";
 import { setProjectPublicPages, submitPortalRequest } from "./service";
 import {
   addIncidentUpdate,
@@ -128,4 +130,49 @@ export const deleteIncidentAction = authActionClient
     const { workspace } = await getWorkspaceAccess(parsedInput.slug);
     await deleteIncident(workspace.id, ctx.user.id, parsedInput.incidentId);
     refresh();
+  });
+
+const VOTER_COOKIE = "tl_voter";
+
+/** Public: upvote a roadmap item (one vote per browser). */
+export const toggleRoadmapVoteAction = actionClient
+  .inputSchema(z.object({ slug: z.string(), projectKey: z.string(), issueId: z.string() }))
+  .action(async ({ parsedInput }) => {
+    const jar = await cookies();
+    let voter = jar.get(VOTER_COOKIE)?.value;
+    if (!voter || !/^[\w-]{20,60}$/.test(voter)) {
+      voter = crypto.randomUUID();
+      jar.set(VOTER_COOKIE, voter, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: env.NEXT_PUBLIC_APP_URL.startsWith("https:"),
+        maxAge: 60 * 60 * 24 * 365,
+        path: "/",
+      });
+    }
+    const result = await toggleVote({
+      workspaceSlug: parsedInput.slug,
+      projectKey: parsedInput.projectKey,
+      issueId: parsedInput.issueId,
+      voterKey: voter,
+    });
+    refresh();
+    return result;
+  });
+
+/** Public: get an email when releases ship. */
+export const subscribeRoadmapAction = actionClient
+  .inputSchema(
+    z.object({
+      slug: z.string(),
+      projectKey: z.string(),
+      email: z.string().trim().email("Enter a valid email").max(200),
+    }),
+  )
+  .action(async ({ parsedInput }) => {
+    await subscribeToRoadmap({
+      workspaceSlug: parsedInput.slug,
+      projectKey: parsedInput.projectKey,
+      email: parsedInput.email,
+    });
   });

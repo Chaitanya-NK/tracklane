@@ -8,13 +8,31 @@ import { z } from "zod";
 import { getWorkspaceAccess } from "@/server/authz";
 import { authActionClient } from "@/server/safe-action";
 import { getDefaultWorkspaceSlug } from "./queries";
-import { createWorkspace, deleteWorkspace, updateWorkspace } from "./service";
+import { createWorkspace, deleteWorkspace, setWorkspaceProfile, updateWorkspace } from "./service";
 
 export const createWorkspaceAction = authActionClient
   .inputSchema(z.object({ name: workspaceNameSchema, slug: workspaceSlugSchema }))
   .action(async ({ parsedInput, ctx }) => {
     const workspace = await createWorkspace({ ...parsedInput, userId: ctx.user.id });
-    redirect(`/${workspace.slug}` as Route);
+    redirect(`/onboarding/${workspace.slug}` as Route);
+  });
+
+export const setWorkspaceProfileAction = authActionClient
+  .inputSchema(
+    z.object({
+      slug: z.string(),
+      teamSize: z.string().max(20),
+      useCases: z.array(z.string().max(20)).max(10),
+    }),
+  )
+  .action(async ({ parsedInput, ctx }) => {
+    const { workspace } = await getWorkspaceAccess(parsedInput.slug);
+    await setWorkspaceProfile({
+      workspaceId: workspace.id,
+      userId: ctx.user.id,
+      teamSize: parsedInput.teamSize,
+      useCases: parsedInput.useCases,
+    });
   });
 
 export const updateWorkspaceAction = authActionClient

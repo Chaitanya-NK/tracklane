@@ -12,6 +12,7 @@ import {
   inviteMembers,
   removeMember,
   revokeInvitation,
+  setAllowedDomain,
   updateMemberRole,
 } from "./service";
 
@@ -83,4 +84,17 @@ export const acceptInvitationAction = authActionClient
   .action(async ({ parsedInput, ctx }) => {
     const workspace = await acceptInvitation({ token: parsedInput.token, user: ctx.user });
     redirect(`/${workspace.slug}` as Route);
+  });
+
+export const setAllowedDomainAction = authActionClient
+  .inputSchema(z.object({ slug: z.string(), domain: z.string().max(120).nullable() }))
+  .action(async ({ parsedInput, ctx }) => {
+    const { workspace } = await getWorkspaceAccess(parsedInput.slug);
+    const result = await setAllowedDomain({
+      workspaceId: workspace.id,
+      userId: ctx.user.id,
+      domain: parsedInput.domain,
+    });
+    refresh();
+    return result;
   });

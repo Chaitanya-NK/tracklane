@@ -8,7 +8,7 @@ const MAX_HOOKS = 25;
 
 export function listWebhooks(workspaceId: string) {
   return db.webhook.findMany({
-    where: { workspaceId },
+    where: { workspaceId, format: "json" },
     orderBy: { createdAt: "asc" },
     select: {
       id: true,

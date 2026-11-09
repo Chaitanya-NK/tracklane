@@ -34,6 +34,8 @@ import { LiveRefresh, liveRooms, Viewers } from "@/components/shared/realtime";
 import { WatchButton } from "@/features/notifications";
 import { SlaChip } from "@/features/sla";
 import { slasForIssue } from "@/features/sla/server";
+import { DevelopmentPanel } from "@/features/integrations";
+import { listDevLinks } from "@/features/integrations/server";
 import { StartTimerButton, TimeTracking, WorkLogList } from "@/features/time";
 import { getIssueTime, getTimer } from "@/features/time/server";
 import { LinkedIssues } from "@/features/links";
@@ -43,6 +45,9 @@ import { ApprovalBanner } from "@/features/workflow";
 import { getPendingApproval } from "@/features/workflow/server";
 import { getIssueByKey, listActivity, listAttachments, listComments } from "./queries";
 import { CopyIssueLink, FlagButton, QuickTransition } from "../components/issue-quick-actions";
+import { StarButton } from "../components/star-button";
+import { isStarred, recordIssueView } from "./stars";
+import { after } from "next/server";
 import { Progress } from "@/components/ui/progress";
 import { loadIssueFormOptions } from "./form-options";
 import { getWorkspaceAccess } from "@/server/authz";
@@ -79,6 +84,7 @@ export async function IssueView({
   if (!issue) notFound();
 
   const key = formatIssueKey(issue.project.key, issue.number);
+  after(() => recordIssueView(user.id, issue.id));
   const [
     options,
     comments,
@@ -89,6 +95,8 @@ export async function IssueView({
     watch,
     time,
     timer,
+    starred,
+    devLinks,
     slas,
     links,
   ] = await Promise.all([
@@ -106,6 +114,8 @@ export async function IssueView({
     getWatchState(issue.id, user.id),
     getIssueTime(issue.id),
     getTimer(user.id),
+    isStarred(user.id, issue.id),
+    listDevLinks(issue.id),
     slasForIssue({
       id: issue.id,
       workspaceId: issue.workspaceId,
@@ -182,6 +192,7 @@ export async function IssueView({
               <div className="ml-auto flex items-center gap-1">
                 <LiveRefresh rooms={[liveRooms.issue(issue.workspaceId, issue.id)]} />
                 <Viewers room={liveRooms.issue(issue.workspaceId, issue.id)} />
+                <StarButton target={{ issueId: issue.id }} starred={starred} label={key} />
                 <FlagButton issueId={issue.id} flagged={issue.flagged} canEdit={canEdit} />
                 <CopyIssueLink path={`/${slug}/issues/${key}`} />
                 <WatchButton issueId={issue.id} watching={watch.watching} count={watch.count} />
@@ -372,6 +383,7 @@ export async function IssueView({
                     </div>
                   ) : null}
                 </section>
+                <DevelopmentPanel links={devLinks} />
                 {slas.length ? (
                   <section aria-labelledby={`sla-${issue.id}`} className="space-y-1.5 px-2">
                     <h3

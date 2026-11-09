@@ -3,3 +3,4 @@ export { InvitationsTable, type InvitationRow } from "./components/invitations-t
 export { InviteMembersDialog } from "./components/invite-members-dialog";
 export { MembersTable, type MemberRow } from "./components/members-table";
 export { parseEmailList } from "./utils";
+export { DomainAutoJoin, PermissionsMatrix } from "./components/members-extras";

@@ -10,10 +10,16 @@ export interface ProjectListItem {
   openIssues: number;
   totalIssues: number;
   updatedAt: Date;
+  starred: boolean;
+  /** People with open work in the project (up to 5). */
+  people: { id: string; name: string; image: string | null }[];
 }
 
 /** Active projects in a workspace with issue counts, most recently updated first. */
-export async function listProjects(workspaceId: string): Promise<ProjectListItem[]> {
+export async function listProjects(
+  workspaceId: string,
+  userId?: string,
+): Promise<ProjectListItem[]> {
   const projects = await db.project.findMany({
     where: { workspaceId, archivedAt: null },
     orderBy: { updatedAt: "desc" },
@@ -25,7 +31,13 @@ export async function listProjects(workspaceId: string): Promise<ProjectListItem
       updatedAt: true,
       lead: { select: { id: true, name: true, image: true } },
       _count: { select: { issues: true } },
+      stars: { where: { userId: userId ?? "" }, select: { userId: true } },
     },
+  });
+  const people = await db.issue.findMany({
+    where: { workspaceId, assigneeId: { not: null }, status: { category: { not: "done" } } },
+    distinct: ["projectId", "assigneeId"],
+    select: { projectId: true, assignee: { select: { id: true, name: true, image: true } } },
   });
   const open = await db.issue.groupBy({
     by: ["projectId"],
@@ -42,6 +54,11 @@ export async function listProjects(workspaceId: string): Promise<ProjectListItem
     updatedAt: p.updatedAt,
     totalIssues: p._count.issues,
     openIssues: openByProject.get(p.id) ?? 0,
+    starred: p.stars.length > 0,
+    people: people
+      .filter((x) => x.projectId === p.id && x.assignee)
+      .map((x) => x.assignee!)
+      .slice(0, 5),
   }));
 }
 
