@@ -4,7 +4,8 @@ A self-hostable, Jira-style project management platform — boards, backlogs, sp
 reports, docs, automation and a REST API — built with **Next.js 16**, **shadcn/ui**, **Prisma 7**
 and **PostgreSQL**. Everything runs on free, open-source software.
 
-> **Status:** Phase 11 (API & public pages) of 12. Phase 10 (AI) was dropped. See [the roadmap](#roadmap).
+> **Status:** All planned phases are done (Phase 10, AI, was dropped). See [the roadmap](#roadmap)
+> and [docs/SECURITY.md](docs/SECURITY.md) before running it in production.
 
 ## Run it in GitHub Codespaces (recommended)
 
@@ -47,6 +48,19 @@ pnpm db:seed
 pnpm dev              # web :3000, realtime :4001, worker
 ```
 
+### Sign in with Google or GitHub
+
+The buttons are always on the sign-in page; until a provider is configured, clicking it explains
+how to enable it. Create a free OAuth app and put its keys in `.env`:
+
+- **GitHub:** Settings → Developer settings → OAuth Apps. Callback URL
+  `<APP_URL>/api/auth/callback/github`. Set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`.
+- **Google:** console.cloud.google.com → APIs & Services → Credentials → OAuth client ID (web).
+  Redirect URI `<APP_URL>/api/auth/callback/google`. Set `GOOGLE_CLIENT_ID` and
+  `GOOGLE_CLIENT_SECRET`.
+
+Restart the web app afterwards. "Sign in with SSO" is a placeholder: SAML/OIDC isn't built.
+
 ## What's running
 
 | Process               | Port | What it does                                                 |
@@ -66,14 +80,15 @@ emails land in Mailpit (port 8025). Browser push needs the VAPID keys `setup.sh`
 
 ## Scripts
 
-| Command                            | Description                                  |
-| ---------------------------------- | -------------------------------------------- |
-| `pnpm dev`                         | Start web, realtime and worker in watch mode |
-| `pnpm build`                       | Production build                             |
-| `pnpm lint` / `typecheck` / `test` | Quality checks (run in CI on every push)     |
-| `pnpm format`                      | Format everything with Prettier              |
-| `pnpm db:migrate`                  | Create/apply a migration after schema edits  |
-| `pnpm db:studio`                   | Browse the database in Prisma Studio         |
+| Command                                 | Description                                      |
+| --------------------------------------- | ------------------------------------------------ |
+| `pnpm dev`                              | Start web, realtime and worker in watch mode     |
+| `pnpm build`                            | Production build                                 |
+| `pnpm lint` / `typecheck` / `test`      | Quality checks (run in CI on every push)         |
+| `pnpm --filter @tracklane/web test:e2e` | Playwright end-to-end tests (after `pnpm build`) |
+| `pnpm format`                           | Format everything with Prettier                  |
+| `pnpm db:migrate`                       | Create/apply a migration after schema edits      |
+| `pnpm db:studio`                        | Browse the database in Prisma Studio             |
 
 ## Project structure
 
@@ -86,25 +101,25 @@ packages/
   core/       Shared domain constants, types, errors and pure helpers
   db/         Prisma schema, migrations, seed and the database client
   config/     Shared TypeScript and ESLint configuration
-docs/         Architecture and conventions
+docs/         Architecture, conventions, TQL and security
 ```
 
 Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before adding features.
 
 ## Roadmap
 
-| #   | Phase                       | Scope                                                               |
-| --- | --------------------------- | ------------------------------------------------------------------- |
-| 0   | Foundation ✅               | Monorepo, tooling, dev container, CI, app shell, dark mode          |
-| 1   | Auth & workspaces ✅        | Sign-in, onboarding, members, roles                                 |
-| 2   | Projects & issues ✅        | Projects, issue detail, comments, activity, labels, attachments     |
-| 3   | Board & backlog ✅          | Drag-and-drop board, sprints, swimlanes, quick view, shortcuts      |
-| 4   | Views & search ✅           | List view, saved views, TQL search, calendar, timeline, ⌘K          |
-| 5   | Workflow & fields ✅        | Workflow editor, approvals, custom fields, TQL functions, swimlanes |
-| 6   | Notifications & realtime ✅ | Inbox, mentions, email, push, live updates, presence, resolutions   |
-| 7   | Reports & time ✅           | Burndown, velocity, CFD, dashboards, workload, timesheets, SLAs     |
-| 8   | Planning tools ✅           | Releases, goals, automation, dependency graph, recurring issues     |
-| 9   | Collaboration ✅            | Docs, diagrams as code, whiteboard, retros, planning poker          |
-| 10  | ~~AI~~ (dropped)            | Not planned                                                         |
-| 11  | API & public pages ✅       | REST API v1, webhooks, API docs, request portal, roadmap, status    |
-| 12  | Hardening                   | Audit log, SSO, i18n, accessibility, PWA, e2e tests                 |
+| #   | Phase                       | Scope                                                                        |
+| --- | --------------------------- | ---------------------------------------------------------------------------- |
+| 0   | Foundation ✅               | Monorepo, tooling, dev container, CI, app shell, dark mode                   |
+| 1   | Auth & workspaces ✅        | Sign-in, onboarding, members, roles                                          |
+| 2   | Projects & issues ✅        | Projects, issue detail, comments, activity, labels, attachments              |
+| 3   | Board & backlog ✅          | Drag-and-drop board, sprints, swimlanes, quick view, shortcuts               |
+| 4   | Views & search ✅           | List view, saved views, TQL search, calendar, timeline, ⌘K                   |
+| 5   | Workflow & fields ✅        | Workflow editor, approvals, custom fields, TQL functions, swimlanes          |
+| 6   | Notifications & realtime ✅ | Inbox, mentions, email, push, live updates, presence, resolutions            |
+| 7   | Reports & time ✅           | Burndown, velocity, CFD, dashboards, workload, timesheets, SLAs              |
+| 8   | Planning tools ✅           | Releases, goals, automation, dependency graph, recurring issues              |
+| 9   | Collaboration ✅            | Docs, diagrams as code, whiteboard, retros, planning poker                   |
+| 10  | ~~AI~~ (dropped)            | Not planned                                                                  |
+| 11  | API & public pages ✅       | REST API v1, webhooks, API docs, request portal, roadmap, status             |
+| 12  | Hardening ✅                | Audit log, Google/GitHub sign-in, sessions, security headers, PWA, a11y, e2e |

@@ -63,8 +63,20 @@ Repository / Prisma (packages/db)
 
 ## Auth and access control
 
-- **Identity** is Better Auth (`server/auth`): email + password, optional GitHub/Google OAuth,
+- **Identity** is Better Auth (`server/auth`): email + password, Google and GitHub OAuth,
   password reset by email. Sessions are cookie-based; `/api/auth/*` is Better Auth's handler.
+  - The Google, GitHub and "Sign in with SSO" buttons always show. A provider without
+    `*_CLIENT_ID/SECRET` opens a dialog explaining how to enable it; SSO (SAML/OIDC) is not
+    implemented and its dialog says so.
+  - Account linking is on for Google and GitHub: an OAuth sign-in with a verified email that
+    already has an account links to it. People link and unlink providers under
+    Settings → My account (the last way to sign in can't be removed).
+  - Settings → My account also lists live sessions (device, IP, last active) with per-session
+    and "sign out everywhere else" revocation. The session cookie cache is 60 seconds, so a
+    revoked session stops working within a minute.
+  - Domain auto-join (`server/auth/domain-join.ts`): when a user's verified email matches a
+    workspace's `allowed_domain`, a Better Auth database hook adds them as a member. Admins can
+    only set their own email's domain, and never a public mail provider.
 - `proxy.ts` does only an optimistic cookie check to redirect signed-out visitors. The real
   check happens on the server: `getCurrentUser()` / `requireUser()`.
 - **Workspaces** are Tracklane's own models. Every workspace route lives under
@@ -266,9 +278,28 @@ editable with `issues:update`.
     issues filed as the project lead, rate-limited per IP with a honeypot; the requester gets a
     private tracking link (`portal_requests.token`).
   - `/roadmap/<workspace>/<key>`: epics as Now / Next / Later / Shipped plus upcoming
-    releases, titles and progress only.
+    releases, titles and progress only. Visitors upvote items (one vote per browser via an
+    httpOnly `tl_voter` cookie, rate-limited per IP), read a changelog of released versions and
+    subscribe by email; `shipRelease` emails subscribers after the response (`after()`).
   - `/status/<workspace>`: components, incidents with updates, and a 30-day bar per component.
     Admins run it from Settings → Status page.
+
+## Integrations and onboarding
+
+- **GitHub** (`features/integrations/server/github.ts`, `/api/integrations/github/<id>`): one
+  webhook per workspace, verified with `X-Hub-Signature-256` against a per-integration secret
+  (shown once). Issue keys in PR titles/branches/bodies, branch names and commit messages create
+  `dev_links` shown on the issue. Optional: move issues to In progress when a PR opens and to
+  Done when it merges; smart commits (`WEB-12 #comment …`, `#time 2h`, `#done`).
+- **Slack** is a webhook row with `format = "slack"`: the worker posts `{ text }` instead of the
+  signed JSON envelope. Ordinary webhook lists hide these rows.
+- **CSV import** (`parseCsv` in core) creates issues through the normal service, so permissions,
+  numbering, activity and webhooks apply; bad rows are reported, not fatal.
+- **Onboarding**: creating a workspace leads to `/onboarding/<slug>`: team size and use cases
+  (stored on the workspace), invites, then a first project. Every step can be skipped.
+- **Home** (`features/home`): issue tabs (assigned, worked on, viewed, starred), recent projects
+  (starred first) and an activity feed. Viewing an issue records an `issue_views` row after the
+  response; stars are `issue_stars` / `project_stars`.
 
 ## Search, filters and views
 
@@ -282,6 +313,35 @@ editable with `issues:update`.
   due date, dropping on "Unscheduled" clears it.
 - Subtasks follow their parent between sprints (except out of completed sprints) and don't
   appear as backlog rows.
+
+## Hardening
+
+- **Audit log** (`server/audit`, `features/audit`, Settings → Audit log, admins only). Services
+  call `audit(client, { workspaceId, actor, action, target, metadata })` (inside the
+  transaction when there is one); IP and user agent come from the request. The action catalogue
+  lives in `@tracklane/core` (`AUDIT_ACTIONS`) so labels and filters are shared. Covered: the
+  workspace, members and invitations, roles, auto-join, projects and their public pages, API
+  tokens, webhooks and integrations. CSV export at `/api/audit/export`.
+- **Security headers** (`next.config.ts`): a CSP without nonces (`'self'` plus inline scripts,
+  `frame-ancestors 'none'`, no plugins, forms only to this origin), `nosniff`, `DENY` framing,
+  a strict referrer policy and a restrictive Permissions-Policy; HSTS and
+  `upgrade-insecure-requests` when `NEXT_PUBLIC_APP_URL` is https.
+- **Rate limits**: Better Auth limits auth endpoints in production (sign-in 10/min, sign-up 5/min,
+  password reset 5 per 5 min). `server/rate-limit.ts` is a small in-memory sliding window used by
+  the portal, roadmap votes and subscriptions; the REST API has its own per-token limit. All are
+  per instance.
+- **Retention** (worker `system.retention`, nightly and on start): API request logs and webhook
+  deliveries after 30 days, automation runs after 90, audit events after a year, plus expired
+  sessions and verification tokens. See [SECURITY.md](SECURITY.md).
+- **PWA**: `app/manifest.ts`, icons in `public/icons`, and `public/sw.js`, registered in
+  production builds. The service worker only serves `public/offline.html` when a navigation
+  fails; it never caches pages or data. `proxy.ts` lets the manifest, worker and offline page
+  through signed out.
+- **Accessibility**: a skip link to `#main` on every layout, `prefers-reduced-motion` honoured
+  globally, link-backed tabs without dangling `aria-controls`, and theme colours that meet WCAG
+  AA. The e2e suite fails on serious or critical axe violations on the pages it visits.
+- **Regional format**: `config/locale.ts` reads `NEXT_PUBLIC_APP_LOCALE` (default `en-IN`);
+  every date and number formatter and `<html lang>` use it. UI text is English only.
 
 ## Next.js 16 specifics
 
@@ -316,7 +376,9 @@ editable with `issues:update`.
 - **Commits:** Conventional Commits (`feat(web): …`, `fix(db): …`), enforced by commitlint.
 - **Formatting:** Prettier (+ Tailwind class sorting) on commit via lint-staged.
 - **Types:** `strict` + `noUncheckedIndexedAccess`. No `any` without a comment explaining why.
-- **Tests:** Vitest next to the code (`*.test.ts[x]`); Playwright e2e from Phase 3.
+- **Tests:** Vitest next to the code (`*.test.ts[x]`). Playwright e2e in `apps/web/e2e`
+  against a production build and the demo seed: `pnpm build && pnpm --filter @tracklane/web
+test:e2e` (set `E2E_BASE_URL` to reuse a running server). CI runs both.
 - **Accessibility:** real `<button>`/`<a>`/`<label>`, `aria-label` on icon-only buttons, visible
   focus, color never the only signal.
 - **Database:** every schema change ships as a migration (`pnpm db:migrate`); table and column
