@@ -342,6 +342,7 @@ async function seedDemoProject(workspaceId: string, demoUserId: string) {
   await seedPhase5(workspaceId, project.id, ids, demoUserId, priya.id);
   await seedPhase6(workspaceId, project.id, demoUserId, priya.id);
   await seedPhase7(workspaceId, project.id, demoUserId, priya.id);
+  await seedPhase8(workspaceId, project.id, ids, demoUserId, priya.id);
 
   await db.comment.createMany({
     data: [
@@ -432,8 +433,8 @@ async function seedPhase5(
   await db.customField.create({
     data: {
       projectId,
-      name: "Release",
-      description: "Target release, e.g. 2026.12",
+      name: "Customer",
+      description: "Account the work is for, e.g. Northwind",
       type: "text",
       position: 2,
     },
@@ -756,6 +757,163 @@ async function seedPhase7(
         },
       ],
     },
+  });
+}
+
+/**
+ * Planning tools: releases (one shipped, two planned), a custom "Ops task" type, blocking
+ * links, two goals, automation rules and recurring chores.
+ */
+async function seedPhase8(
+  workspaceId: string,
+  projectId: string,
+  ids: string[],
+  demoUserId: string,
+  priyaId: string,
+) {
+  const DAY = 86_400_000;
+  const today = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00Z");
+  const day = (offset: number) => new Date(today.getTime() + offset * DAY);
+
+  const shipped = await db.release.create({
+    data: {
+      projectId,
+      name: "1.4",
+      description: "Analytics and performance groundwork.",
+      status: "released",
+      startDate: day(-40),
+      releaseDate: day(-10),
+      releasedAt: day(-10),
+    },
+  });
+  const next = await db.release.create({
+    data: {
+      projectId,
+      name: "1.5",
+      description: "The new single-page checkout.",
+      startDate: day(-9),
+      releaseDate: day(14),
+    },
+  });
+  const later = await db.release.create({
+    data: {
+      projectId,
+      name: "2.0",
+      description: "Accessibility and theming.",
+      releaseDate: day(60),
+    },
+  });
+  await db.issue.updateMany({ where: { id: { in: [ids[7]!] } }, data: { releaseId: shipped.id } });
+  await db.issue.updateMany({
+    where: { id: { in: [ids[1]!, ids[2]!, ids[3]!, ids[4]!, ids[5]!] } },
+    data: { releaseId: next.id },
+  });
+  await db.issue.updateMany({ where: { id: { in: [ids[9]!] } }, data: { releaseId: later.id } });
+
+  const ops = await db.projectIssueType.create({
+    data: { projectId, name: "Ops task", baseType: "task", color: "teal", icon: "server" },
+  });
+  await db.issue.update({ where: { id: ids[8]! }, data: { customTypeId: ops.id } });
+
+  await db.issueLink.createMany({
+    data: [
+      // The 3-D Secure bug blocks the checkout form, which blocks saving the cart.
+      { sourceId: ids[3]!, targetId: ids[1]!, type: "blocks", createdById: demoUserId },
+      { sourceId: ids[1]!, targetId: ids[2]!, type: "blocks", createdById: demoUserId },
+      { sourceId: ids[6]!, targetId: ids[7]!, type: "relates", createdById: priyaId },
+    ],
+  });
+
+  const checkout = await db.goal.create({
+    data: {
+      workspaceId,
+      ownerId: demoUserId,
+      name: "Faster, safer checkout",
+      description:
+        "Cut checkout drop-off by a third: one page, no 3-D Secure failures, under 2 s on mobile.",
+      status: "on_track",
+      targetDate: day(45),
+    },
+  });
+  const a11y = await db.goal.create({
+    data: {
+      workspaceId,
+      ownerId: priyaId,
+      name: "Accessible everywhere",
+      description: "Every page meets WCAG 2.2 AA, in light and dark mode.",
+      status: "at_risk",
+      targetDate: day(75),
+    },
+  });
+  await db.goalIssue.createMany({
+    data: [
+      { goalId: checkout.id, issueId: ids[0]! },
+      { goalId: checkout.id, issueId: ids[6]! },
+      { goalId: a11y.id, issueId: ids[10]! },
+    ],
+  });
+
+  await db.automationRule.createMany({
+    data: [
+      {
+        projectId,
+        name: "Triage urgent bugs",
+        trigger: "issue_created",
+        condition: "type = bug AND priority >= high",
+        actions: [
+          { type: "set_assignee", to: priyaId },
+          {
+            type: "add_comment",
+            body: "Auto-assigned for triage. Please confirm severity within a day.",
+          },
+        ],
+        createdById: demoUserId,
+        position: 0,
+      },
+      {
+        projectId,
+        name: "Nudge overdue work",
+        trigger: "scheduled_daily",
+        condition: "due < startOfDay() AND statusCategory != done",
+        actions: [{ type: "notify", to: "assignee", message: "This issue is past its due date." }],
+        createdById: demoUserId,
+        position: 1,
+      },
+    ],
+  });
+
+  // Next Monday and the 1st of next month, 00:00 UTC.
+  const monday = day((8 - today.getUTCDay()) % 7 || 7);
+  const firstOfMonth = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 1));
+  await db.recurringIssue.createMany({
+    data: [
+      {
+        projectId,
+        title: "Update dependencies",
+        description:
+          "Run `pnpm outdated`, update minor versions and check the changelog for majors.",
+        type: "task",
+        priority: "medium",
+        assigneeId: priyaId,
+        frequency: "weekly",
+        days: [1],
+        dueInDays: 3,
+        nextRunAt: monday,
+        createdById: demoUserId,
+      },
+      {
+        projectId,
+        title: "Monthly security review",
+        type: "task",
+        priority: "high",
+        assigneeId: demoUserId,
+        frequency: "monthly",
+        days: [1],
+        dueInDays: 7,
+        nextRunAt: firstOfMonth,
+        createdById: demoUserId,
+      },
+    ],
   });
 }
 
