@@ -23,6 +23,7 @@ import type { PlanningCard } from "@/features/board";
 import { CreateIssueButton } from "@/features/issues";
 import { cn } from "@/lib/utils";
 import { createSprintAction, deleteSprintAction } from "../server/actions";
+import { planCapacity, workingDays } from "../capacity";
 import { CompleteSprintDialog } from "./complete-sprint-dialog";
 import { SprintFormDialog } from "./sprint-form-dialog";
 
@@ -33,6 +34,80 @@ export interface BacklogSprint {
   state: "planned" | "active" | "completed";
   startDate: string | null;
   endDate: string | null;
+  capacities: { userId: string; daysOff: number; points: number | null }[];
+}
+
+/** Team and velocity, for capacity planning. */
+export interface CapacityContext {
+  velocity: number | null;
+  team: { id: string; name: string; image: string | null }[];
+}
+
+/** Members to plan for: anyone with work in the sprint or a capacity row; else the whole team. */
+export function sprintMembers(sprint: BacklogSprint, cards: PlanningCard[], ctx: CapacityContext) {
+  const ids = new Set([
+    ...cards.map((c) => c.assignee?.id).filter((id): id is string => Boolean(id)),
+    ...sprint.capacities.map((c) => c.userId),
+  ]);
+  const people = ctx.team.filter((p) => ids.has(p.id));
+  return (people.length ? people : ctx.team).map((person) => {
+    const row = sprint.capacities.find((c) => c.userId === person.id);
+    return {
+      person,
+      userId: person.id,
+      daysOff: row?.daysOff ?? 0,
+      points: row?.points ?? null,
+      assigned: cards
+        .filter((c) => c.assignee?.id === person.id && c.status.category !== "done")
+        .reduce((sum, c) => sum + (c.estimate ?? 0), 0),
+    };
+  });
+}
+
+function CapacityBar({
+  sprint,
+  cards,
+  ctx,
+}: {
+  sprint: BacklogSprint;
+  cards: PlanningCard[];
+  ctx: CapacityContext;
+}) {
+  const days =
+    sprint.startDate && sprint.endDate ? workingDays(sprint.startDate, sprint.endDate) : 10;
+  const plan = planCapacity(sprintMembers(sprint, cards, ctx), { velocity: ctx.velocity, days });
+  const committed = cards.reduce((sum, c) => sum + (c.estimate ?? 0), 0);
+  if (plan.total === null || plan.total === 0) return null;
+  const pct = Math.min(100, Math.round((committed / plan.total) * 100));
+  const over = committed > plan.total;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span
+            className="h-1.5 w-24 overflow-hidden rounded-full bg-muted"
+            role="meter"
+            aria-label="Capacity used"
+            aria-valuemin={0}
+            aria-valuemax={plan.total}
+            aria-valuenow={committed}
+          >
+            <span
+              className={cn("block h-full rounded-full", over ? "bg-destructive" : "bg-primary")}
+              style={{ width: `${pct}%` }}
+            />
+          </span>
+          <span className={cn("tabular-nums", over && "font-medium text-destructive")}>
+            {committed}/{plan.total} pts
+          </span>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>
+        {over ? "Over capacity — " : ""}Capacity from{" "}
+        {sprint.capacities.length ? "the sprint plan" : "recent velocity"}
+      </TooltipContent>
+    </Tooltip>
+  );
 }
 
 const CATEGORY_TONE = {
@@ -98,6 +173,7 @@ export function BacklogSection({
   canManageSprints,
   canCreateIssues,
   plannedSprints,
+  capacity,
   children,
 }: {
   slug: string;
@@ -110,6 +186,7 @@ export function BacklogSection({
   canManageSprints: boolean;
   canCreateIssues: boolean;
   plannedSprints: { id: string; name: string }[];
+  capacity: CapacityContext;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(true);
@@ -157,6 +234,7 @@ export function BacklogSection({
             {points ? ` · ${points} pts` : ""}
           </span>
           <span className="ml-auto flex items-center gap-2">
+            {sprint ? <CapacityBar sprint={sprint} cards={cards} ctx={capacity} /> : null}
             <CategoryTotals cards={cards} />
             {canManageSprints ? (
               sprint ? (
@@ -238,6 +316,10 @@ export function BacklogSection({
             onOpenChange={(o) => !o && setDialog(null)}
             issueCount={cards.length}
             sprint={sprint}
+            capacity={{
+              members: sprintMembers(sprint, cards, capacity),
+              velocity: capacity.velocity,
+            }}
           />
         ) : null}
         {sprint && dialog === "edit" ? (

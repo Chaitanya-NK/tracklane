@@ -314,3 +314,19 @@ export async function setBacklogStatus(input: {
     data: { backlogStatusId: input.statusId },
   });
 }
+
+/** Sets (or clears, with null) the board column's work-in-progress limit. */
+export async function setWipLimit(input: {
+  workspaceId: string;
+  projectId: string;
+  userId: string;
+  statusId: string;
+  limit: number | null;
+}) {
+  await editableProject(input.workspaceId, input.projectId, input.userId);
+  const { count } = await db.workflowStatus.updateMany({
+    where: { id: input.statusId, projectId: input.projectId },
+    data: { wipLimit: input.limit },
+  });
+  if (!count) throw new AppError("not_found", "Status not found");
+}

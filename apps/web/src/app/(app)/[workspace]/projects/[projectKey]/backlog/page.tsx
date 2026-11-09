@@ -7,9 +7,9 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toPlanningCard } from "@/features/board/server";
-import { listStatuses } from "@/features/projects/server";
+import { listAssignableUsers, listStatuses } from "@/features/projects/server";
 import { Backlog, KanbanBacklog } from "@/features/sprints";
-import { getBacklog, getKanbanBacklog } from "@/features/sprints/server";
+import { getBacklog, getKanbanBacklog, getVelocity, listEpics } from "@/features/sprints/server";
 import { getProjectAccess } from "@/server/authz";
 
 export const metadata: Metadata = { title: "Backlog" };
@@ -31,7 +31,7 @@ function BacklogSkeleton() {
 
 async function ProjectBacklog({ params }: { params: Props["params"] }) {
   const { workspace: slug, projectKey } = await params;
-  const { user, project, role } = await getProjectAccess(slug, projectKey);
+  const { workspace, user, project, role } = await getProjectAccess(slug, projectKey);
   if (project.type === "kanban") {
     const backlogStatusId = project.backlogStatusId;
     if (!backlogStatusId) {
@@ -73,7 +73,12 @@ async function ProjectBacklog({ params }: { params: Props["params"] }) {
       />
     );
   }
-  const { sprints, backlog } = await getBacklog(project.id);
+  const [{ sprints, backlog }, velocity, epics, team] = await Promise.all([
+    getBacklog(project.id),
+    getVelocity(project.id),
+    listEpics(project.id),
+    listAssignableUsers(workspace.id),
+  ]);
 
   return (
     <Backlog
@@ -83,6 +88,8 @@ async function ProjectBacklog({ params }: { params: Props["params"] }) {
       canEdit={can(role, "issues:update")}
       canManageSprints={can(role, "sprints:manage")}
       backlog={backlog.map(toPlanningCard)}
+      capacity={{ velocity, team }}
+      epics={epics}
       sprints={sprints.map((sprint) => ({
         id: sprint.id,
         name: sprint.name,
@@ -90,6 +97,7 @@ async function ProjectBacklog({ params }: { params: Props["params"] }) {
         state: sprint.state,
         startDate: toDateString(sprint.startDate),
         endDate: toDateString(sprint.endDate),
+        capacities: sprint.capacities,
         cards: sprint.issues.map(toPlanningCard),
       }))}
     />

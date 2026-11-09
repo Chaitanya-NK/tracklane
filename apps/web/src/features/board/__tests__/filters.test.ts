@@ -18,6 +18,9 @@ const card = (over: Partial<PlanningCard>): PlanningCard => ({
   dueDate: null,
   customType: null,
   blockedBy: [],
+  flagged: false,
+  updatedAt: "2026-11-09T10:00:00Z",
+  subtasks: null,
   ...over,
 });
 
@@ -32,5 +35,25 @@ describe("card filters", () => {
       true,
     );
     expect(matchesFilters(card({}), { ...EMPTY_FILTERS, assignees: ["none"] }, "me")).toBe(true);
+  });
+
+  it("filters by type, epic and recent updates", () => {
+    const now = new Date("2026-11-09T12:00:00Z").getTime();
+    const epic = { id: "e1", key: "WEB-9", title: "Checkout", type: "epic" as const };
+    expect(matchesFilters(card({}), { ...EMPTY_FILTERS, types: ["bug"] }, "me", now)).toBe(true);
+    expect(matchesFilters(card({}), { ...EMPTY_FILTERS, types: ["story"] }, "me", now)).toBe(false);
+    expect(
+      matchesFilters(card({ parent: epic }), { ...EMPTY_FILTERS, epics: ["e1"] }, "me", now),
+    ).toBe(true);
+    expect(matchesFilters(card({}), { ...EMPTY_FILTERS, epics: ["none"] }, "me", now)).toBe(true);
+    expect(matchesFilters(card({}), { ...EMPTY_FILTERS, recent: true }, "me", now)).toBe(true);
+    expect(
+      matchesFilters(
+        card({ updatedAt: "2026-11-01T00:00:00Z" }),
+        { ...EMPTY_FILTERS, recent: true },
+        "me",
+        now,
+      ),
+    ).toBe(false);
   });
 });

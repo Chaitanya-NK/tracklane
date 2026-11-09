@@ -18,10 +18,17 @@ export interface PlanningCard {
   customType: { name: string; color: string; icon: string } | null;
   /** Keys of open issues blocking this one. */
   blockedBy: string[];
+  flagged: boolean;
+  /** ISO timestamp. */
+  updatedAt: string;
+  /** Child issues done/total, when there are any. */
+  subtasks: { done: number; total: number } | null;
 }
 
 export interface BoardColumn {
   id: string;
   name: string;
   category: StatusCategory;
+  /** Work-in-progress limit (null = none). */
+  wipLimit?: number | null;
 }

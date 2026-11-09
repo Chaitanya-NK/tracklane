@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/select";
 import type { CustomFieldValue } from "@/features/custom-fields";
 import { setIssueFieldValueAction } from "@/features/custom-fields/server/actions";
+import { setIssueComponentsAction } from "../server/actions";
 import { toDateInputValue } from "@/lib/format";
 import type { IssueFormOptions } from "../types";
 import { CustomFieldInput } from "./custom-field-input";
@@ -50,6 +51,7 @@ export interface IssueDetailsValue {
   parentId: string | null;
   sprintId: string | null;
   labelIds: string[];
+  componentIds: string[];
   startDate: Date | null;
   dueDate: Date | null;
   estimate: number | null;
@@ -96,6 +98,7 @@ export function IssueDetailsPanel({
   const nameOf = (userId: string | null) => options.assignees.find((u) => u.id === userId)?.name;
   const parentLabel = issue.type === "subtask" ? "Parent" : "Epic";
   const setField = useAction(setIssueFieldValueAction);
+  const setComponents = useAction(setIssueComponentsAction);
   const [resolving, setResolving] = useState<{ id: string; name: string } | null>(null);
 
   async function saveField(fieldId: string, name: string, value: CustomFieldValue | null) {
@@ -255,6 +258,25 @@ export function IssueDetailsPanel({
           disabled={disabled}
         />
       </Row>
+      {options.components.length ? (
+        <Row label="Components" htmlFor="f-components">
+          <LabelsPicker
+            id="f-components"
+            variant="ghost"
+            label="Components"
+            searchPlaceholder="Search components…"
+            emptyText="No components."
+            value={issue.componentIds}
+            onChange={async (componentIds) => {
+              const res = await setComponents.executeAsync({ issueId: issue.id, componentIds });
+              if (res?.serverError) toast.error(res.serverError.message);
+              else if (res?.data?.changed) toast.success("Components updated");
+            }}
+            labels={options.components}
+            disabled={disabled}
+          />
+        </Row>
+      ) : null}
       <Row label={parentLabel} htmlFor="f-parent">
         <ParentPicker
           id="f-parent"

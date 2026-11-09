@@ -42,6 +42,8 @@ import { getWatchState } from "@/features/notifications/server";
 import { ApprovalBanner } from "@/features/workflow";
 import { getPendingApproval } from "@/features/workflow/server";
 import { getIssueByKey, listActivity, listAttachments, listComments } from "./queries";
+import { CopyIssueLink, FlagButton, QuickTransition } from "../components/issue-quick-actions";
+import { Progress } from "@/components/ui/progress";
 import { loadIssueFormOptions } from "./form-options";
 import { getWorkspaceAccess } from "@/server/authz";
 
@@ -95,7 +97,7 @@ export async function IssueView({
       role,
       userId: user.id,
     }),
-    listComments(issue.id),
+    listComments(issue.id, user.id),
     listAttachments(issue.id),
     listActivity(issue.id),
     getIssueFieldValues(issue.id),
@@ -115,6 +117,10 @@ export async function IssueView({
   const canEdit = can(role, "issues:update");
   const childLabel = issue.type === "epic" ? "Issues in this epic" : "Subtasks";
   const canHaveChildren = issue.type !== "subtask";
+  const childrenDone = issue.children.filter((c) => c.status.category === "done").length;
+  const childProgress = issue.children.length
+    ? Math.round((childrenDone / issue.children.length) * 100)
+    : 0;
 
   return (
     <div className="@container">
@@ -174,6 +180,8 @@ export async function IssueView({
               <div className="ml-auto flex items-center gap-1">
                 <LiveRefresh rooms={[liveRooms.issue(issue.workspaceId, issue.id)]} />
                 <Viewers room={liveRooms.issue(issue.workspaceId, issue.id)} />
+                <FlagButton issueId={issue.id} flagged={issue.flagged} canEdit={canEdit} />
+                <CopyIssueLink path={`/${slug}/issues/${key}`} />
                 <WatchButton issueId={issue.id} watching={watch.watching} count={watch.count} />
                 <IssueActionsMenu
                   slug={slug}
@@ -184,6 +192,19 @@ export async function IssueView({
               </div>
             </div>
             <IssueTitle issueId={issue.id} title={issue.title} canEdit={canEdit} />
+            <div className="flex flex-wrap items-center gap-2">
+              <QuickTransition
+                issueId={issue.id}
+                statusId={issue.statusId}
+                statusCategory={issue.status.category}
+                options={options}
+              />
+              {issue.flagged ? (
+                <span className="inline-flex items-center gap-1 rounded-md bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-300">
+                  Flagged
+                </span>
+              ) : null}
+            </div>
           </div>
 
           {approval ? (
@@ -219,6 +240,18 @@ export async function IssueView({
                 ) : null}
               </div>
               {issue.children.length ? (
+                <div className="flex items-center gap-3">
+                  <Progress
+                    value={childProgress}
+                    className="h-2 flex-1"
+                    aria-label={`${childrenDone} of ${issue.children.length} done`}
+                  />
+                  <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                    {childrenDone} of {issue.children.length} done · {childProgress}%
+                  </span>
+                </div>
+              ) : null}
+              {issue.children.length ? (
                 <IssueTable slug={slug} issues={issue.children} />
               ) : (
                 <p className="text-sm text-muted-foreground">None yet.</p>
@@ -245,10 +278,14 @@ export async function IssueView({
 
           <Tabs defaultValue="comments">
             <TabsList>
+              <TabsTrigger value="all">All activity</TabsTrigger>
               <TabsTrigger value="comments">Comments ({comments.length})</TabsTrigger>
               <TabsTrigger value="history">History</TabsTrigger>
               <TabsTrigger value="worklog">Work log ({time.worklogs.length})</TabsTrigger>
             </TabsList>
+            <TabsContent value="all" className="pt-4">
+              <IssueActivity items={activity} comments={comments} />
+            </TabsContent>
             <TabsContent value="comments" className="pt-4">
               <IssueComments
                 issueId={issue.id}
@@ -294,6 +331,7 @@ export async function IssueView({
                   parentId: issue.parent?.id ?? null,
                   sprintId: issue.sprintId,
                   labelIds: issue.labels.map((l) => l.label.id),
+                  componentIds: issue.components.map((c) => c.componentId),
                   startDate: issue.startDate,
                   dueDate: issue.dueDate,
                   estimate: issue.estimate,

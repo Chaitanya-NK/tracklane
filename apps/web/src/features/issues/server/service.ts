@@ -28,6 +28,7 @@ import { defaultResolutionId, resolutionFields } from "@/features/resolutions/se
 import { type FieldValueInput, writeFieldValues } from "@/features/custom-fields/server/values";
 import { gateStatusChange, type StatusChange } from "@/features/workflow/server/transition";
 import { assertWorkspacePermission } from "@/server/authz";
+import { publish, rooms } from "@/server/realtime/publish";
 import { diffIssue, type IssueSnapshot } from "../activity";
 
 type Tx = Prisma.TransactionClient;
@@ -692,13 +693,24 @@ export async function addComment(input: {
   issueId: string;
   userId: string;
   body: string;
+  /** Reply to this comment (replies to a reply join the same thread). */
+  parentId?: string | null;
   source?: "automation";
 }) {
   const workspaceId = await issueWorkspace(input.issueId);
   await assertWorkspacePermission(workspaceId, input.userId, "comments:create");
+  let parentId: string | null = null;
+  if (input.parentId) {
+    const parent = await db.comment.findFirst({
+      where: { id: input.parentId, issueId: input.issueId },
+      select: { id: true, parentId: true },
+    });
+    if (!parent) throw new AppError("not_found", "The comment you're replying to is gone");
+    parentId = parent.parentId ?? parent.id;
+  }
   return db.$transaction(async (tx) => {
     const comment = await tx.comment.create({
-      data: { issueId: input.issueId, authorId: input.userId, body: input.body },
+      data: { issueId: input.issueId, authorId: input.userId, body: input.body, parentId },
       select: { id: true, issue: { select: { id: true, workspaceId: true, projectId: true } } },
     });
     await tx.issueActivity.create({
@@ -756,6 +768,20 @@ export async function updateComment(input: { commentId: string; userId: string; 
 export async function deleteComment(input: { commentId: string; userId: string }) {
   await assertCanManageComment(input.commentId, input.userId);
   await db.comment.delete({ where: { id: input.commentId } });
+}
+
+/** Adds the user's reaction, or removes it if already there. */
+export async function toggleReaction(input: { commentId: string; userId: string; emoji: string }) {
+  const comment = await db.comment.findUnique({
+    where: { id: input.commentId },
+    select: { issue: { select: { workspaceId: true } } },
+  });
+  if (!comment) throw new AppError("not_found", "Comment not found");
+  await assertWorkspacePermission(comment.issue.workspaceId, input.userId, "comments:create");
+  const key = { commentId: input.commentId, userId: input.userId, emoji: input.emoji };
+  const removed = await db.commentReaction.deleteMany({ where: key });
+  if (!removed.count) await db.commentReaction.create({ data: key });
+  return { reacted: removed.count === 0 };
 }
 
 // ── Attachments ─────────────────────────────────────────────────────────────
@@ -822,4 +848,93 @@ export async function deleteAttachment(input: { attachmentId: string; userId: st
     }),
   ]);
   return attachment.storageKey;
+}
+
+// ── Flags and components ────────────────────────────────────────────────────
+
+async function loadForEdit(issueId: string, userId: string) {
+  const issue = await db.issue.findUnique({
+    where: { id: issueId },
+    select: { id: true, workspaceId: true, projectId: true, flagged: true },
+  });
+  if (!issue) throw new AppError("not_found", "Issue not found");
+  await assertWorkspacePermission(issue.workspaceId, userId, "issues:update");
+  return issue;
+}
+
+/** Flags an issue as blocked/impeded (shown on board cards), or clears the flag. */
+export async function setIssueFlag(input: { issueId: string; userId: string; flagged: boolean }) {
+  const issue = await loadForEdit(input.issueId, input.userId);
+  if (issue.flagged === input.flagged) return { changed: 0 };
+  await db.$transaction(async (tx) => {
+    await tx.issue.update({ where: { id: issue.id }, data: { flagged: input.flagged } });
+    await tx.issueActivity.create({
+      data: {
+        issueId: issue.id,
+        actorId: input.userId,
+        action: input.flagged ? "flagged" : "unflagged",
+      },
+    });
+    await publish(tx, {
+      rooms: [
+        rooms.project(issue.workspaceId, issue.projectId),
+        rooms.issue(issue.workspaceId, issue.id),
+      ],
+      event: "issue:changed",
+      data: { issueId: issue.id, actorId: input.userId },
+    });
+  });
+  return { changed: 1 };
+}
+
+/** Replaces the issue's components (all must belong to its project). */
+export async function setIssueComponents(input: {
+  issueId: string;
+  userId: string;
+  componentIds: string[];
+}) {
+  const issue = await loadForEdit(input.issueId, input.userId);
+  const ids = [...new Set(input.componentIds)];
+  const [valid, current] = await Promise.all([
+    db.projectComponent.findMany({
+      where: { id: { in: ids }, projectId: issue.projectId },
+      select: { id: true, name: true },
+    }),
+    db.issueComponent.findMany({
+      where: { issueId: issue.id },
+      select: { component: { select: { id: true, name: true } } },
+    }),
+  ]);
+  if (valid.length !== ids.length) throw new AppError("validation_failed", "Unknown component");
+  const before = current.map((c) => c.component.name).sort();
+  const after = valid.map((c) => c.name).sort();
+  if (before.join("\u0000") === after.join("\u0000")) return { changed: 0 };
+  await db.$transaction(async (tx) => {
+    await tx.issueComponent.deleteMany({ where: { issueId: issue.id } });
+    if (ids.length) {
+      await tx.issueComponent.createMany({
+        data: ids.map((componentId) => ({ issueId: issue.id, componentId })),
+      });
+    }
+    await tx.issueActivity.create({
+      data: {
+        issueId: issue.id,
+        actorId: input.userId,
+        action: "updated",
+        field: "components",
+        fromValue: before.join(", ") || null,
+        toValue: after.join(", ") || null,
+      },
+    });
+    await tx.issue.update({ where: { id: issue.id }, data: { updatedAt: new Date() } });
+    await publish(tx, {
+      rooms: [
+        rooms.project(issue.workspaceId, issue.projectId),
+        rooms.issue(issue.workspaceId, issue.id),
+      ],
+      event: "issue:changed",
+      data: { issueId: issue.id, actorId: input.userId },
+    });
+  });
+  return { changed: 1 };
 }

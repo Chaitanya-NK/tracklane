@@ -34,7 +34,13 @@ import { PriorityIcon } from "@/features/issues";
 import { moveIssueAction } from "@/features/issues/server/actions";
 import { cn } from "@/lib/utils";
 import { type Columns, findColumn, moveItem, neighboursOf } from "../columns";
-import { type CardFilters, EMPTY_FILTERS, isFiltering, matchesFilters } from "../filters";
+import {
+  type CardFilters,
+  EMPTY_FILTERS,
+  filterOptionsFor,
+  isFiltering,
+  matchesFilters,
+} from "../filters";
 import {
   cellId,
   cellsFrom,
@@ -48,7 +54,7 @@ import {
   parseCellId,
 } from "../lanes";
 import type { BoardColumn as Column, PlanningCard } from "../types";
-import { BoardColumn, ColumnHeader } from "./board-column";
+import { BoardColumn, type ColumnContext, ColumnHeader } from "./board-column";
 import { CardFiltersBar } from "./card-filters-bar";
 import { IssueCard } from "./issue-card";
 
@@ -67,6 +73,7 @@ export function Board({
   canEdit,
   currentUserId,
   transitions,
+  columnContext,
 }: {
   slug: string;
   columns: Column[];
@@ -74,6 +81,7 @@ export function Board({
   canEdit: boolean;
   currentUserId: string;
   transitions: { restrict: boolean; rules: TransitionRule[] };
+  columnContext?: ColumnContext;
 }) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -125,6 +133,14 @@ export function Board({
     for (const card of cards) if (card.assignee) seen.set(card.assignee.id, card.assignee);
     return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
   }, [cards]);
+
+  const { typeOptions, epicOptions } = useMemo(
+    () =>
+      filterOptionsFor(cards, (c) =>
+        c.customType ? c.customType.name : c.type[0]!.toUpperCase() + c.type.slice(1),
+      ),
+    [cards],
+  );
 
   const visible = (ids: string[]) =>
     ids
@@ -223,7 +239,13 @@ export function Board({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <CardFiltersBar filters={filters} onChange={setFilters} people={people} />
+        <CardFiltersBar
+          filters={filters}
+          onChange={setFilters}
+          people={people}
+          typeOptions={typeOptions}
+          epicOptions={epicOptions}
+        />
         <Select value={grouping} onValueChange={(v) => setGrouping(v as LaneGrouping)}>
           <SelectTrigger size="sm" className="w-48" aria-label="Swimlanes">
             <Rows3Icon className="text-muted-foreground" aria-hidden="true" />
@@ -267,6 +289,7 @@ export function Board({
                   slug={slug}
                   canEdit={canEdit}
                   blocked={!canDropIn(id)}
+                  ctx={columnContext}
                 />
               ))}
             </div>
@@ -287,7 +310,7 @@ export function Board({
                           reachable && !reachable.has(column.id) && "opacity-40",
                         )}
                       >
-                        <ColumnHeader column={column} count={count} />
+                        <ColumnHeader column={column} count={count} ctx={columnContext} />
                       </div>
                     );
                   })}

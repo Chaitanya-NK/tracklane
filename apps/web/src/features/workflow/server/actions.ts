@@ -13,6 +13,7 @@ import {
   setBacklogStatus,
   setRestrictTransitions,
   setTransition,
+  setWipLimit,
   updateStatus,
 } from "./service";
 
@@ -47,6 +48,19 @@ export const updateStatusAction = authActionClient
     });
     refresh();
     return status;
+  });
+
+export const setWipLimitAction = authActionClient
+  .inputSchema(
+    z.object({
+      ...project,
+      statusId: z.string(),
+      limit: z.number().int().min(1).max(999).nullable(),
+    }),
+  )
+  .action(async ({ parsedInput: { slug, projectKey, statusId, limit }, ctx }) => {
+    await setWipLimit({ ...(await access(slug, projectKey, ctx.user.id)), statusId, limit });
+    refresh();
   });
 
 export const reorderStatusesAction = authActionClient

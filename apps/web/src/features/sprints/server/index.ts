@@ -3,6 +3,8 @@ export {
   getBacklog,
   getBoardIssues,
   getKanbanBacklog,
+  getVelocity,
+  listEpics,
   listOpenSprints,
   planningIssueSelect,
   type PlanningIssue,

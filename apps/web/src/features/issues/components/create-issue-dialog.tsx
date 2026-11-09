@@ -45,6 +45,7 @@ import type { IssueFormOptions, ProjectOption } from "../types";
 import { parseTypeValue, TypeOptions, typeValue } from "./type-choice";
 import { CustomFieldInput } from "./custom-field-input";
 import { AssigneePicker, LabelsPicker, ParentPicker } from "./field-pickers";
+import { createLabelAction } from "@/features/projects/server/actions";
 import { PriorityIcon } from "./issue-meta";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -137,6 +138,10 @@ function CreateIssueForm({
   // Remounts uncontrolled custom field inputs after "Create another".
   const [createdCount, setCreatedCount] = useState(0);
   const [titleError, setTitleError] = useState<string | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [newLabels, setNewLabels] = useState<IssueFormOptions["labels"]>([]);
+  const [labelName, setLabelName] = useState("");
+  const addLabel = useAction(createLabelAction);
 
   const loadProjects = useAction(listProjectOptionsAction);
   const loadOptions = useAction(getIssueFormOptionsAction);
@@ -198,7 +203,28 @@ function CreateIssueForm({
       ),
     });
     if (!res?.data) return;
-    const href = `/${slug}/issues/${res.data.key}` as Route;
+    const created = res.data;
+    const href = `/${slug}/issues/${created.key}` as Route;
+    if (files.length) {
+      const results = await Promise.all(
+        files.map(async (file) => {
+          const body = new FormData();
+          body.append("file", file);
+          try {
+            const up = await fetch(`/api/issues/${created.id}/attachments`, {
+              method: "POST",
+              body,
+            });
+            return up.ok;
+          } catch {
+            return false;
+          }
+        }),
+      );
+      const failed = results.filter((ok) => !ok).length;
+      if (failed) toast.error(`${failed} attachment${failed === 1 ? "" : "s"} didn't upload`);
+      setFiles([]);
+    }
     toast.success(`Created ${res.data.key}`, {
       action: { label: "View", onClick: () => router.push(href) },
     });
@@ -306,6 +332,40 @@ function CreateIssueForm({
                 />
               </Field>
 
+              <Field>
+                <FieldLabel htmlFor="ci-files">Attachments</FieldLabel>
+                <Input
+                  id="ci-files"
+                  type="file"
+                  multiple
+                  onChange={(e) => {
+                    const picked = Array.from(e.target.files ?? []);
+                    setFiles((f) => [...f, ...picked].slice(0, 10));
+                    e.target.value = "";
+                  }}
+                />
+                {files.length ? (
+                  <ul className="flex flex-wrap gap-1.5">
+                    {files.map((file, i) => (
+                      <li
+                        key={`${file.name}-${i}`}
+                        className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs"
+                      >
+                        {file.name}
+                        <button
+                          type="button"
+                          className="text-muted-foreground hover:text-foreground"
+                          aria-label={`Remove ${file.name}`}
+                          onClick={() => setFiles((f) => f.filter((_, j) => j !== i))}
+                        >
+                          ×
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </Field>
+
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field>
                   <FieldLabel htmlFor="ci-status">Status</FieldLabel>
@@ -372,7 +432,53 @@ function CreateIssueForm({
                     id="ci-labels"
                     value={draft.labelIds}
                     onChange={(v) => update("labelIds", v)}
-                    labels={options.labels}
+                    labels={[
+                      ...options.labels,
+                      ...newLabels.filter((l) => !options.labels.some((o) => o.id === l.id)),
+                    ]}
+                    footer={
+                      options.canEdit ? (
+                        <form
+                          className="flex gap-1 border-t p-2"
+                          onSubmit={async (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const name = labelName.trim();
+                            if (!name || !projectKey) return;
+                            const res = await addLabel.executeAsync({
+                              slug,
+                              projectKey,
+                              name,
+                              color: "gray",
+                            });
+                            if (res?.serverError) return void toast.error(res.serverError.message);
+                            if (!res?.data) return;
+                            const label = res.data;
+                            setNewLabels((l) => [...l, label]);
+                            update("labelIds", [...draft.labelIds, label.id]);
+                            setLabelName("");
+                          }}
+                        >
+                          <Input
+                            value={labelName}
+                            onChange={(e) => setLabelName(e.target.value)}
+                            onKeyDown={(e) => e.stopPropagation()}
+                            placeholder="New label"
+                            aria-label="New label name"
+                            className="h-8"
+                            maxLength={40}
+                          />
+                          <Button
+                            type="submit"
+                            size="sm"
+                            variant="secondary"
+                            disabled={!labelName.trim() || addLabel.isPending}
+                          >
+                            Add
+                          </Button>
+                        </form>
+                      ) : null
+                    }
                   />
                 </Field>
                 {parentTypes.length ? (

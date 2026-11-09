@@ -1,6 +1,15 @@
 "use client";
 
-import { SearchIcon, UserIcon, XIcon } from "lucide-react";
+import { ChevronDownIcon, ClockIcon, SearchIcon, UserIcon, XIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,15 +23,69 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { type CardFilters, EMPTY_FILTERS, isFiltering } from "../filters";
 
+export interface FilterOption {
+  value: string;
+  label: string;
+}
+
+function MultiFilter({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: FilterOption[];
+  value: string[];
+  onChange: (next: string[]) => void;
+}) {
+  if (options.length === 0) return null;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" className={value.length ? undefined : "border-dashed"}>
+          {label}
+          {value.length ? (
+            <Badge variant="secondary" className="h-5 rounded-sm px-1 font-normal">
+              {value.length}
+            </Badge>
+          ) : null}
+          <ChevronDownIcon aria-hidden="true" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-56">
+        <DropdownMenuLabel>{label}</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {options.map((o) => (
+          <DropdownMenuCheckboxItem
+            key={o.value}
+            checked={value.includes(o.value)}
+            onSelect={(e) => e.preventDefault()}
+            onCheckedChange={(checked) =>
+              onChange(checked ? [...value, o.value] : value.filter((v) => v !== o.value))
+            }
+          >
+            <span className="truncate">{o.label}</span>
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 /** Quick filters shared by the board and the backlog. */
 export function CardFiltersBar({
   filters,
   onChange,
   people,
+  typeOptions = [],
+  epicOptions = [],
 }: {
   filters: CardFilters;
   onChange: (filters: CardFilters) => void;
   people: { id: string; name: string; image: string | null }[];
+  typeOptions?: FilterOption[];
+  epicOptions?: FilterOption[];
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -84,6 +147,18 @@ export function CardFiltersBar({
           </Tooltip>
         </ToggleGroup>
       ) : null}
+      <MultiFilter
+        label="Epic"
+        options={epicOptions}
+        value={filters.epics}
+        onChange={(epics) => onChange({ ...filters, epics })}
+      />
+      <MultiFilter
+        label="Type"
+        options={typeOptions}
+        value={filters.types}
+        onChange={(types) => onChange({ ...filters, types })}
+      />
       <Toggle
         variant="outline"
         size="sm"
@@ -91,6 +166,14 @@ export function CardFiltersBar({
         onPressedChange={(onlyMine) => onChange({ ...filters, onlyMine })}
       >
         Only my issues
+      </Toggle>
+      <Toggle
+        variant="outline"
+        size="sm"
+        pressed={filters.recent}
+        onPressedChange={(recent) => onChange({ ...filters, recent })}
+      >
+        <ClockIcon aria-hidden="true" /> Recently updated
       </Toggle>
       {isFiltering(filters) ? (
         <Button variant="ghost" size="sm" onClick={() => onChange(EMPTY_FILTERS)}>

@@ -24,6 +24,7 @@ export async function loadIssueFormOptions(input: {
     resolutions,
     customTypes,
     releases,
+    components,
   ] = await Promise.all([
     listStatuses(input.project.id),
     listAssignableUsers(input.workspaceId),
@@ -57,6 +58,11 @@ export async function loadIssueFormOptions(input: {
       take: 40,
       select: { id: true, name: true, status: true },
     }),
+    db.projectComponent.findMany({
+      where: { projectId: input.project.id },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
   ]);
   return {
     project: {
@@ -69,6 +75,7 @@ export async function loadIssueFormOptions(input: {
     statuses: statuses.map(({ id, name, category }) => ({ id, name, category })),
     assignees,
     labels,
+    components: components.map((c) => ({ ...c, color: "gray" })),
     parents,
     transitions,
     customFields,

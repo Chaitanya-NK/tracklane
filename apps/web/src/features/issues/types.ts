@@ -7,6 +7,8 @@ export interface IssueFormOptions {
   statuses: { id: string; name: string; category: StatusCategory }[];
   assignees: { id: string; name: string; email: string; image: string | null }[];
   labels: { id: string; name: string; color: string }[];
+  /** The project's components (API, Checkout…). */
+  components: { id: string; name: string; color: string }[];
   /** Active and planned sprints (Scrum projects). */
   sprints: { id: string; name: string; state: "planned" | "active" | "completed" }[];
   /** Possible parents: epics and (for subtasks) stories, tasks and bugs. */

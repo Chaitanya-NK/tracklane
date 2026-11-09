@@ -8,6 +8,7 @@ import Link from "next/link";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { BlockedBadge, EpicChip, type PlanningCard } from "@/features/board";
 import { IssueTypeIcon, LabelBadge, PriorityIcon, StatusBadge } from "@/features/issues";
@@ -21,11 +22,14 @@ export function BacklogRow({
   overlay,
   handleProps,
   actions,
+  selection,
 }: {
   card: PlanningCard;
   slug: string;
   dragging?: boolean;
   overlay?: boolean;
+  /** Bulk-selection checkbox state. */
+  selection?: { checked: boolean; onChange: (checked: boolean) => void };
   handleProps?: React.HTMLAttributes<HTMLButtonElement> & { disabled?: boolean };
   /** Extra controls at the end of the row. */
   actions?: React.ReactNode;
@@ -36,8 +40,17 @@ export function BacklogRow({
         "flex items-center gap-2 border-b bg-background px-2 py-1.5 text-sm last:border-b-0",
         dragging && "opacity-40",
         overlay && "rounded-md border shadow-lg",
+        selection?.checked && "bg-primary/5",
       )}
     >
+      {selection ? (
+        <Checkbox
+          aria-label={`Select ${card.key}`}
+          checked={selection.checked}
+          onCheckedChange={(on) => selection.onChange(on === true)}
+          className="ml-1"
+        />
+      ) : null}
       <Button
         type="button"
         variant="ghost"
@@ -101,11 +114,13 @@ export function SortableBacklogRow({
   slug,
   disabled,
   actions,
+  selection,
 }: {
   card: PlanningCard;
   slug: string;
   disabled?: boolean;
   actions?: React.ReactNode;
+  selection?: { checked: boolean; onChange: (checked: boolean) => void };
 }) {
   const {
     attributes,
@@ -126,6 +141,7 @@ export function SortableBacklogRow({
         slug={slug}
         dragging={isDragging}
         actions={actions}
+        selection={selection}
         handleProps={
           {
             ...attributes,

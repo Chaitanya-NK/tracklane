@@ -1,3 +1,4 @@
+import { Markdown } from "@/components/shared/markdown";
 import { TimeAgo } from "@/components/shared/time-ago";
 import { UserAvatar } from "@/components/shared/user-avatar";
 
@@ -27,6 +28,7 @@ const FIELD_LABELS: Record<string, string> = {
   resolution: "resolution",
   timeEstimate: "time estimate",
   release: "release",
+  components: "components",
 };
 
 function Value({ children }: { children: string | null }) {
@@ -92,6 +94,10 @@ function describe(item: ActivityItem) {
           logged <Value>{item.toValue}</Value>
         </>
       );
+    case "flagged":
+      return <>flagged the issue</>;
+    case "unflagged":
+      return <>removed the flag</>;
     case "field_cleared":
       return <>cleared {item.field}</>;
     default: {
@@ -106,21 +112,67 @@ function describe(item: ActivityItem) {
   }
 }
 
-/** The history tab: who changed what, newest first. */
-export function IssueActivity({ items }: { items: ActivityItem[] }) {
-  if (items.length === 0) return <p className="text-sm text-muted-foreground">No history yet.</p>;
+/**
+ * The history tab: who changed what, newest first. With `comments`, an "All activity" feed that
+ * interleaves comments (shown in full) with changes.
+ */
+export function IssueActivity({
+  items,
+  comments,
+}: {
+  items: ActivityItem[];
+  comments?: {
+    id: string;
+    body: string;
+    createdAt: Date;
+    parentId: string | null;
+    author: { id: string; name: string; image: string | null } | null;
+  }[];
+}) {
+  type Entry =
+    | { kind: "change"; at: number; item: ActivityItem }
+    | { kind: "comment"; at: number; comment: NonNullable<typeof comments>[number] };
+  const entries: Entry[] = [
+    ...items
+      .filter((i) => !comments || i.action !== "commented")
+      .map((item) => ({ kind: "change" as const, at: new Date(item.createdAt).getTime(), item })),
+    ...(comments ?? []).map((comment) => ({
+      kind: "comment" as const,
+      at: new Date(comment.createdAt).getTime(),
+      comment,
+    })),
+  ].sort((a, b) => b.at - a.at);
+
+  if (entries.length === 0) return <p className="text-sm text-muted-foreground">No history yet.</p>;
   return (
     <ol className="space-y-4">
-      {items.map((item) => (
-        <li key={item.id} className="flex gap-3 text-sm">
-          <UserAvatar user={item.actor ?? { name: "?" }} className="mt-0.5 size-6" />
-          <p className="leading-6">
-            <span className="font-medium">{item.actor?.name ?? "Former member"}</span>{" "}
-            {describe(item)} <span className="text-muted-foreground">· </span>
-            <TimeAgo date={item.createdAt} className="text-muted-foreground" />
-          </p>
-        </li>
-      ))}
+      {entries.map((entry) =>
+        entry.kind === "change" ? (
+          <li key={entry.item.id} className="flex gap-3 text-sm">
+            <UserAvatar user={entry.item.actor ?? { name: "?" }} className="mt-0.5 size-6" />
+            <p className="leading-6">
+              <span className="font-medium">{entry.item.actor?.name ?? "Former member"}</span>{" "}
+              {describe(entry.item)} <span className="text-muted-foreground">· </span>
+              <TimeAgo date={entry.item.createdAt} className="text-muted-foreground" />
+            </p>
+          </li>
+        ) : (
+          <li key={entry.comment.id} className="flex gap-3 text-sm">
+            <UserAvatar user={entry.comment.author ?? { name: "?" }} className="mt-0.5 size-6" />
+            <div className="min-w-0 flex-1 space-y-1">
+              <p className="leading-6">
+                <span className="font-medium">{entry.comment.author?.name ?? "Former member"}</span>{" "}
+                {entry.comment.parentId ? "replied" : "commented"}{" "}
+                <span className="text-muted-foreground">· </span>
+                <TimeAgo date={entry.comment.createdAt} className="text-muted-foreground" />
+              </p>
+              <div className="rounded-md border bg-muted/30 px-3 py-2">
+                <Markdown>{entry.comment.body}</Markdown>
+              </div>
+            </div>
+          </li>
+        ),
+      )}
     </ol>
   );
 }

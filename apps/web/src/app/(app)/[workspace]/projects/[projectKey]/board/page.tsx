@@ -83,11 +83,18 @@ async function ProjectBoard({ params }: { params: Props["params"] }) {
         slug={slug}
         columns={statuses
           .filter((s) => project.type !== "kanban" || s.id !== project.backlogStatusId)
-          .map(({ id, name, category }) => ({ id, name, category }))}
+          .map(({ id, name, category, wipLimit }) => ({ id, name, category, wipLimit }))}
         transitions={transitions}
         cards={cards}
         canEdit={can(role, "issues:update")}
         currentUserId={user.id}
+        columnContext={{
+          slug,
+          projectKey: project.key,
+          sprintId: sprint?.id ?? null,
+          canManage: can(role, "projects:update"),
+          canCreate: can(role, "issues:create"),
+        }}
       />
     </div>
   );

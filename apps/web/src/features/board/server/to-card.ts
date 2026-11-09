@@ -27,5 +27,13 @@ export function toPlanningCard(issue: PlanningIssue): PlanningCard {
     dueDate: issue.dueDate ? issue.dueDate.toISOString().slice(0, 10) : null,
     customType: issue.customType,
     blockedBy: issue.linksIn.map((l) => formatIssueKey(l.source.project.key, l.source.number)),
+    flagged: issue.flagged,
+    updatedAt: issue.updatedAt.toISOString(),
+    subtasks: issue.children.length
+      ? {
+          done: issue.children.filter((c) => c.status.category === "done").length,
+          total: issue.children.length,
+        }
+      : null,
   };
 }

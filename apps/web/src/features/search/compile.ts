@@ -175,6 +175,13 @@ function equals(field: string, value: TqlValue, ctx: CompileContext): Where {
     }
     case "labels":
       return { labels: { some: { label: { name: ci(literal(value)) } } } };
+    case "component":
+      return { components: { some: { component: { name: ci(literal(value)) } } } };
+    case "flagged": {
+      const v = literal(value).toLowerCase();
+      if (v !== "true" && v !== "false") throw new CompileError("flagged is true or false");
+      return { flagged: v === "true" };
+    }
     case "sprint":
       if (value.kind === "function") return SPRINT_FUNCTIONS[value.name]!;
       return { sprint: { name: ci(literal(value)) } };
@@ -202,6 +209,7 @@ const EMPTY: Record<string, Where> = {
   assignee: { assigneeId: null },
   reporter: { reporterId: null },
   labels: { labels: { none: {} } },
+  component: { components: { none: {} } },
   sprint: { sprintId: null },
   release: { releaseId: null },
   parent: { parentId: null },

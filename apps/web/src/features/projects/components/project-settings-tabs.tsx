@@ -3,7 +3,7 @@
 import { useParams } from "next/navigation";
 import { LinkTabs } from "@/components/shared/link-tabs";
 
-/** General · Workflow · Fields · Issue types · SLAs · Automation · Recurring under a project's Settings tab. */
+/** General · Workflow · Fields · Issue types · Components · SLAs · Automation · Recurring under a project's Settings tab. */
 export function ProjectSettingsTabs() {
   const { workspace, projectKey } = useParams<{ workspace: string; projectKey: string }>();
   const base = `/${workspace}/projects/${projectKey}/settings`;
@@ -15,6 +15,7 @@ export function ProjectSettingsTabs() {
         { title: "Workflow", href: `${base}/workflow` },
         { title: "Fields", href: `${base}/fields` },
         { title: "Issue types", href: `${base}/issue-types` },
+        { title: "Components", href: `${base}/components` },
         { title: "SLAs", href: `${base}/slas` },
         { title: "Automation", href: `${base}/automation` },
         { title: "Recurring", href: `${base}/recurring` },

@@ -26,6 +26,7 @@ import {
   type CardFilters,
   type Columns,
   EMPTY_FILTERS,
+  filterOptionsFor,
   findColumn,
   isFiltering,
   matchesFilters,
@@ -34,8 +35,18 @@ import {
   type PlanningCard,
 } from "@/features/board";
 import { moveIssueAction } from "@/features/issues/server/actions";
+import { bulkUpdateAction } from "@/features/search/server/actions";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { BacklogRow, SortableBacklogRow } from "./backlog-row";
-import { BacklogSection, type BacklogSprint } from "./backlog-section";
+import { BacklogSection, type BacklogSprint, type CapacityContext } from "./backlog-section";
+import { type EpicSummary, EpicsPanel } from "./epics-panel";
 
 export const BACKLOG_ID = "backlog";
 
@@ -65,6 +76,8 @@ export function Backlog({
   canEdit,
   canManageSprints,
   currentUserId,
+  capacity,
+  epics,
 }: {
   slug: string;
   projectKey: string;
@@ -73,7 +86,32 @@ export function Backlog({
   canEdit: boolean;
   canManageSprints: boolean;
   currentUserId: string;
+  capacity: CapacityContext;
+  epics: EpicSummary[];
 }) {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [showEpics, setShowEpics] = useState(true);
+  const bulk = useAction(bulkUpdateAction);
+  const select = (id: string, on: boolean) =>
+    setSelected((set) => {
+      const next = new Set(set);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  async function moveSelected(target: string) {
+    const ids = [...selected];
+    const res = await bulk.executeAsync({
+      slug,
+      issueIds: ids,
+      patch: { sprintId: target === BACKLOG_ID ? null : target },
+    });
+    if (res?.serverError) return void toast.error(res.serverError.message);
+    const name =
+      target === BACKLOG_ID ? "the backlog" : (sprints.find((s) => s.id === target)?.name ?? "");
+    toast.success(`${res?.data?.updated ?? ids.length} issues moved to ${name}`);
+    setSelected(new Set());
+  }
   const allCards = useMemo(
     () => [...sprints.flatMap((s) => s.cards), ...backlog],
     [sprints, backlog],
@@ -166,57 +204,134 @@ export function Backlog({
   const planned = sprints.filter((s) => s.state === "planned");
   const hasActive = sprints.some((s) => s.state === "active");
 
+  const { typeOptions } = useMemo(
+    () =>
+      filterOptionsFor(allCards, (c) =>
+        c.customType ? c.customType.name : c.type[0]!.toUpperCase() + c.type.slice(1),
+      ),
+    [allCards],
+  );
+
   return (
-    <div className="space-y-4">
-      <CardFiltersBar filters={filters} onChange={setFilters} people={people} />
-      <DndContext
-        id="backlog"
-        sensors={sensors}
-        collisionDetection={closestCorners}
-        onDragStart={onDragStart}
-        onDragOver={onDragOver}
-        onDragEnd={onDragEnd}
-        onDragCancel={() => {
-          setActiveId(null);
-          setDragLists(null);
-        }}
-      >
-        {[...sprints.map((s) => s.id), BACKLOG_ID].map((listId) => {
-          const sprint = sprints.find((s) => s.id === listId);
-          const visible = cardsIn(listId);
-          return (
-            <BacklogSection
-              key={listId}
-              slug={slug}
-              projectKey={projectKey}
-              sprint={sprint ?? null}
-              cards={allIn(listId)}
-              visibleCount={visible.length}
-              filtering={isFiltering(filters)}
-              canStart={Boolean(
-                sprint && sprint.state === "planned" && !hasActive && sprint.id === planned[0]?.id,
-              )}
-              canManageSprints={canManageSprints}
-              canCreateIssues={canEdit}
-              plannedSprints={planned.filter((s) => s.id !== listId)}
-            >
-              <SortableContext
-                items={visible.map((c) => c.id)}
-                strategy={verticalListSortingStrategy}
+    <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+      {showEpics && epics.length + (canEdit ? 1 : 0) > 0 ? (
+        <EpicsPanel
+          epics={epics}
+          selected={filters.epics}
+          onSelect={(ids) => setFilters({ ...filters, epics: ids })}
+          projectKey={projectKey}
+          canCreate={canEdit}
+        />
+      ) : null}
+      <div className="min-w-0 flex-1 space-y-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <CardFiltersBar
+            filters={filters}
+            onChange={setFilters}
+            people={people}
+            typeOptions={typeOptions}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto"
+            aria-pressed={showEpics}
+            onClick={() => setShowEpics((v) => !v)}
+          >
+            {showEpics ? "Hide epics" : "Show epics"}
+          </Button>
+        </div>
+        <DndContext
+          id="backlog"
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={onDragStart}
+          onDragOver={onDragOver}
+          onDragEnd={onDragEnd}
+          onDragCancel={() => {
+            setActiveId(null);
+            setDragLists(null);
+          }}
+        >
+          {[...sprints.map((s) => s.id), BACKLOG_ID].map((listId) => {
+            const sprint = sprints.find((s) => s.id === listId);
+            const visible = cardsIn(listId);
+            return (
+              <BacklogSection
+                key={listId}
+                slug={slug}
+                projectKey={projectKey}
+                sprint={sprint ?? null}
+                cards={allIn(listId)}
+                visibleCount={visible.length}
+                filtering={isFiltering(filters)}
+                canStart={Boolean(
+                  sprint &&
+                  sprint.state === "planned" &&
+                  !hasActive &&
+                  sprint.id === planned[0]?.id,
+                )}
+                canManageSprints={canManageSprints}
+                canCreateIssues={canEdit}
+                plannedSprints={planned.filter((s) => s.id !== listId)}
+                capacity={capacity}
               >
-                <DroppableList id={listId} empty={visible.length === 0}>
-                  {visible.map((card) => (
-                    <SortableBacklogRow key={card.id} card={card} slug={slug} disabled={!canDrag} />
-                  ))}
-                </DroppableList>
-              </SortableContext>
-            </BacklogSection>
-          );
-        })}
-        <DragOverlay>
-          {active ? <BacklogRow card={active} slug={slug} overlay /> : null}
-        </DragOverlay>
-      </DndContext>
+                <SortableContext
+                  items={visible.map((c) => c.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <DroppableList id={listId} empty={visible.length === 0}>
+                    {visible.map((card) => (
+                      <SortableBacklogRow
+                        key={card.id}
+                        card={card}
+                        slug={slug}
+                        disabled={!canDrag}
+                        selection={
+                          canDrag
+                            ? {
+                                checked: selected.has(card.id),
+                                onChange: (on) => select(card.id, on),
+                              }
+                            : undefined
+                        }
+                      />
+                    ))}
+                  </DroppableList>
+                </SortableContext>
+              </BacklogSection>
+            );
+          })}
+          <DragOverlay>
+            {active ? <BacklogRow card={active} slug={slug} overlay /> : null}
+          </DragOverlay>
+        </DndContext>
+        {selected.size ? (
+          <div
+            role="region"
+            aria-label="Selected issues"
+            className="sticky bottom-4 z-20 mx-auto flex w-fit flex-wrap items-center gap-2 rounded-lg border bg-background px-3 py-2 shadow-lg"
+          >
+            <span className="text-sm font-medium">{selected.size} selected</span>
+            <Select onValueChange={moveSelected} disabled={bulk.isPending}>
+              <SelectTrigger size="sm" className="w-48" aria-label="Move selected to">
+                <SelectValue placeholder="Move to…" />
+              </SelectTrigger>
+              <SelectContent>
+                {sprints.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}
+                  </SelectItem>
+                ))}
+                <SelectItem value={BACKLOG_ID}>Backlog</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>
+              Clear
+            </Button>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

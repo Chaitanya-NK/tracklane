@@ -28,7 +28,11 @@ import {
   moveIssue,
   updateComment,
   updateIssue,
+  setIssueComponents,
+  setIssueFlag,
+  toggleReaction,
 } from "./service";
+import { REACTIONS } from "../reactions";
 import { loadIssueFormOptions } from "./form-options";
 
 const issueFields = {
@@ -116,7 +120,13 @@ export const deleteIssueAction = authActionClient
   });
 
 export const addCommentAction = authActionClient
-  .inputSchema(z.object({ issueId: z.string(), body: commentBodySchema }))
+  .inputSchema(
+    z.object({
+      issueId: z.string(),
+      body: commentBodySchema,
+      parentId: z.string().nullable().optional(),
+    }),
+  )
   .action(async ({ parsedInput, ctx }) => {
     await addComment({ ...parsedInput, userId: ctx.user.id });
     refresh();
@@ -134,6 +144,30 @@ export const deleteCommentAction = authActionClient
   .action(async ({ parsedInput, ctx }) => {
     await deleteComment({ ...parsedInput, userId: ctx.user.id });
     refresh();
+  });
+
+export const setIssueFlagAction = authActionClient
+  .inputSchema(z.object({ issueId: z.string(), flagged: z.boolean() }))
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await setIssueFlag({ ...parsedInput, userId: ctx.user.id });
+    refresh();
+    return result;
+  });
+
+export const setIssueComponentsAction = authActionClient
+  .inputSchema(z.object({ issueId: z.string(), componentIds: z.array(z.string()).max(20) }))
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await setIssueComponents({ ...parsedInput, userId: ctx.user.id });
+    refresh();
+    return result;
+  });
+
+export const toggleReactionAction = authActionClient
+  .inputSchema(z.object({ commentId: z.string(), emoji: z.enum(REACTIONS) }))
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await toggleReaction({ ...parsedInput, userId: ctx.user.id });
+    refresh();
+    return result;
   });
 
 export const deleteAttachmentAction = authActionClient

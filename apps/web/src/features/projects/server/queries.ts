@@ -50,7 +50,7 @@ export function listStatuses(projectId: string) {
   return db.workflowStatus.findMany({
     where: { projectId },
     orderBy: { position: "asc" },
-    select: { id: true, name: true, category: true, position: true },
+    select: { id: true, name: true, category: true, position: true, wipLimit: true },
   });
 }
 

@@ -5,7 +5,14 @@ import { refresh } from "next/cache";
 import { z } from "zod";
 import { getProjectAccess } from "@/server/authz";
 import { authActionClient } from "@/server/safe-action";
-import { completeSprint, createSprint, deleteSprint, startSprint, updateSprint } from "./service";
+import {
+  completeSprint,
+  createSprint,
+  deleteSprint,
+  saveSprintCapacity,
+  startSprint,
+  updateSprint,
+} from "./service";
 
 const date = dueDateSchema.unwrap();
 
@@ -66,4 +73,24 @@ export const deleteSprintAction = authActionClient
     const result = await deleteSprint({ ...parsedInput, userId: ctx.user.id });
     refresh();
     return result;
+  });
+
+export const saveSprintCapacityAction = authActionClient
+  .inputSchema(
+    z.object({
+      sprintId: z.string(),
+      rows: z
+        .array(
+          z.object({
+            userId: z.string(),
+            daysOff: z.number().int().min(0).max(60),
+            points: z.number().int().min(0).max(999).nullable(),
+          }),
+        )
+        .max(100),
+    }),
+  )
+  .action(async ({ parsedInput, ctx }) => {
+    await saveSprintCapacity({ ...parsedInput, userId: ctx.user.id });
+    refresh();
   });

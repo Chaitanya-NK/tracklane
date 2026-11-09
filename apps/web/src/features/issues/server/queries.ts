@@ -102,6 +102,8 @@ export async function getIssueByKey(workspaceId: string, issueKey: string) {
       reporter: { select: { id: true, name: true, image: true } },
       parent: { select: { id: true, number: true, title: true, type: true } },
       labels: { select: { label: { select: { id: true, name: true, color: true } } } },
+      components: { select: { componentId: true } },
+      flagged: true,
       children: { orderBy: { number: "asc" }, select: issueListSelect },
     },
   });
@@ -109,17 +111,37 @@ export async function getIssueByKey(workspaceId: string, issueKey: string) {
 
 export type IssueDetail = NonNullable<Awaited<ReturnType<typeof getIssueByKey>>>;
 
-export function listComments(issueId: string) {
-  return db.comment.findMany({
+/** Comments oldest first, with reply parent and reactions grouped by emoji. */
+export async function listComments(issueId: string, userId?: string) {
+  const comments = await db.comment.findMany({
     where: { issueId },
     orderBy: { createdAt: "asc" },
     select: {
       id: true,
       body: true,
+      parentId: true,
       editedAt: true,
       createdAt: true,
       author: { select: { id: true, name: true, image: true } },
+      reactions: {
+        orderBy: { createdAt: "asc" },
+        select: { emoji: true, userId: true, user: { select: { name: true } } },
+      },
     },
+  });
+  return comments.map(({ reactions, ...c }) => {
+    const groups = new Map<
+      string,
+      { emoji: string; count: number; mine: boolean; names: string[] }
+    >();
+    for (const r of reactions) {
+      const g = groups.get(r.emoji) ?? { emoji: r.emoji, count: 0, mine: false, names: [] };
+      g.count++;
+      g.mine ||= r.userId === userId;
+      g.names.push(r.user.name);
+      groups.set(r.emoji, g);
+    }
+    return { ...c, reactions: [...groups.values()] };
   });
 }
 

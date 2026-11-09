@@ -203,3 +203,28 @@ export async function deleteSprint(input: { sprintId: string; userId: string }) 
   await db.sprint.delete({ where: { id: sprint.id } });
   return { name: sprint.name };
 }
+
+/** Replaces the sprint's capacity plan (days off and manual points per person). */
+export async function saveSprintCapacity(input: {
+  sprintId: string;
+  userId: string;
+  rows: { userId: string; daysOff: number; points: number | null }[];
+}) {
+  const sprint = await authorize(input.sprintId, input.userId);
+  if (sprint.state === "completed") throw new AppError("conflict", "The sprint is already over");
+  const members = await db.workspaceMember.findMany({
+    where: {
+      workspaceId: sprint.project.workspaceId,
+      userId: { in: input.rows.map((r) => r.userId) },
+    },
+    select: { userId: true },
+  });
+  const allowed = new Set(members.map((m) => m.userId));
+  const rows = input.rows.filter((r) => allowed.has(r.userId));
+  await db.$transaction([
+    db.sprintCapacity.deleteMany({ where: { sprintId: sprint.id } }),
+    db.sprintCapacity.createMany({
+      data: rows.map((r) => ({ sprintId: sprint.id, ...r })),
+    }),
+  ]);
+}

@@ -1,6 +1,8 @@
 import "server-only";
+import { formatIssueKey } from "@tracklane/core";
 import { db, type Prisma } from "@tracklane/db";
 import { issueListSelect } from "@/features/issues/server";
+import { averageVelocity } from "../capacity";
 
 /** Issue fields shown on board cards and backlog rows. */
 export const planningIssueSelect = {
@@ -8,6 +10,8 @@ export const planningIssueSelect = {
   position: true,
   sprintId: true,
   parent: { select: { id: true, number: true, title: true, type: true } },
+  flagged: true,
+  children: { select: { status: { select: { category: true } } } },
   // Open issues blocking this one.
   linksIn: {
     where: { type: "blocks", source: { status: { category: { not: "done" } } } },
@@ -27,6 +31,7 @@ const sprintSelect = {
   startedAt: true,
   completedAt: true,
   committedPoints: true,
+  capacities: { select: { userId: true, daysOff: true, points: true } },
 } satisfies Prisma.SprintSelect;
 
 export type SprintSummary = Prisma.SprintGetPayload<{ select: typeof sprintSelect }>;
@@ -111,4 +116,40 @@ export function listOpenSprints(projectId: string) {
     orderBy: { createdAt: "asc" },
     select: { id: true, name: true, state: true },
   });
+}
+
+/** Average completed points of the last three completed sprints (null without history). */
+export async function getVelocity(projectId: string): Promise<number | null> {
+  const sprints = await db.sprint.findMany({
+    where: { projectId, state: "completed" },
+    orderBy: { completedAt: "desc" },
+    take: 3,
+    select: { completedPoints: true },
+  });
+  return averageVelocity(sprints.map((s) => s.completedPoints));
+}
+
+/** The project's open epics with child progress, for the backlog's epic panel. */
+export async function listEpics(projectId: string) {
+  const epics = await db.issue.findMany({
+    where: { projectId, type: "epic" },
+    orderBy: [{ position: "asc" }, { number: "asc" }],
+    select: {
+      id: true,
+      number: true,
+      title: true,
+      project: { select: { key: true } },
+      status: { select: { category: true } },
+      children: { select: { estimate: true, status: { select: { category: true } } } },
+    },
+  });
+  return epics.map((e) => ({
+    id: e.id,
+    key: formatIssueKey(e.project.key, e.number),
+    title: e.title,
+    done: e.status.category === "done",
+    total: e.children.length,
+    completed: e.children.filter((c) => c.status.category === "done").length,
+    points: e.children.reduce((sum, c) => sum + (c.estimate ?? 0), 0),
+  }));
 }

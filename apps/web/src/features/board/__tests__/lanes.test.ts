@@ -18,6 +18,9 @@ const card = (id: string, patch: Partial<PlanningCard> = {}): PlanningCard => ({
   dueDate: null,
   customType: null,
   blockedBy: [],
+  flagged: false,
+  updatedAt: "2026-11-09T10:00:00Z",
+  subtasks: null,
   ...patch,
 });
 
