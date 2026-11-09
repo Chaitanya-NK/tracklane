@@ -3,6 +3,7 @@ import { heartbeatJob } from "./heartbeat";
 import { automationDailyJob, filterDigestsJob, recurringIssuesJob } from "./planning";
 import { deliverWebhooksJob } from "./webhooks";
 import { slaCheckJob } from "./sla";
+import { retentionJob } from "./retention";
 import { projectSnapshotsJob } from "./snapshots";
 import type { JobDefinition } from "./types";
 
@@ -16,4 +17,5 @@ export const jobs: JobDefinition<any>[] = [
   recurringIssuesJob,
   deliverWebhooksJob,
   filterDigestsJob,
+  retentionJob,
 ];
