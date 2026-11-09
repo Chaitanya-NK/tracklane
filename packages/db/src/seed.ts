@@ -343,6 +343,7 @@ async function seedDemoProject(workspaceId: string, demoUserId: string) {
   await seedPhase6(workspaceId, project.id, demoUserId, priya.id);
   await seedPhase7(workspaceId, project.id, demoUserId, priya.id);
   await seedPhase8(workspaceId, project.id, ids, demoUserId, priya.id);
+  await seedPhase9(workspaceId, project.id, demoUserId, priya.id);
 
   await db.comment.createMany({
     data: [
@@ -915,6 +916,177 @@ async function seedPhase8(
       },
     ],
   });
+}
+
+/** Collaboration: a page tree with a diagram, a whiteboard, a retro mid-discussion, a poker session. */
+async function seedPhase9(
+  workspaceId: string,
+  projectId: string,
+  demoUserId: string,
+  priyaId: string,
+) {
+  const page = async (data: {
+    title: string;
+    body: string;
+    projectId?: string;
+    parentId?: string;
+    authorId: string;
+  }) => {
+    const doc = await db.doc.create({
+      data: {
+        workspaceId,
+        projectId: data.projectId ?? null,
+        parentId: data.parentId ?? null,
+        title: data.title,
+        body: data.body,
+        createdById: data.authorId,
+        updatedById: data.authorId,
+      },
+    });
+    await db.docVersion.create({
+      data: {
+        docId: doc.id,
+        version: 1,
+        title: data.title,
+        body: data.body,
+        authorId: data.authorId,
+      },
+    });
+    return doc;
+  };
+
+  const handbook = await page({
+    title: "Engineering handbook",
+    authorId: demoUserId,
+    body: [
+      "How we build and ship at Acme.",
+      "",
+      "## How work flows",
+      "",
+      "```mermaid",
+      "flowchart LR",
+      "  Idea --> Backlog --> Sprint --> Review{Code review}",
+      "  Review -- approved --> Release",
+      "  Review -- changes --> Sprint",
+      "```",
+      "",
+      "## Principles",
+      "",
+      "- Small pull requests, reviewed within a day.",
+      "- Every bug gets a test that fails before the fix.",
+      "- Ship behind a flag when in doubt.",
+    ].join("\n"),
+  });
+  await page({
+    title: "On-call runbook",
+    parentId: handbook.id,
+    authorId: priyaId,
+    body: [
+      "## When the pager goes off",
+      "",
+      "1. Acknowledge within 5 minutes.",
+      "2. Check the status dashboard and recent deploys.",
+      "3. Roll back first, investigate second.",
+      "",
+      "| Severity | Response | Who to wake |",
+      "| --- | --- | --- |",
+      "| SEV1 | 15 min | Lead + on-call |",
+      "| SEV2 | 1 hour | On-call |",
+    ].join("\n"),
+  });
+  await page({
+    title: "Checkout architecture",
+    projectId,
+    authorId: demoUserId,
+    body: [
+      "The new single-page checkout talks to three services.",
+      "",
+      "```mermaid",
+      "sequenceDiagram",
+      "  participant B as Browser",
+      "  participant C as Checkout API",
+      "  participant P as Payments",
+      "  B->>C: Submit order",
+      "  C->>P: Authorise card (3-D Secure)",
+      "  P-->>C: Approved",
+      "  C-->>B: Order confirmed",
+      "```",
+    ].join("\n"),
+  });
+
+  await db.whiteboard.create({
+    data: {
+      workspaceId,
+      projectId,
+      name: "Checkout flow sketch",
+      createdById: demoUserId,
+      scene: { elements: [] },
+    },
+  });
+
+  const lastSprint = await db.sprint.findFirst({
+    where: { projectId, state: "completed" },
+    orderBy: { createdAt: "desc" },
+  });
+  const retro = await db.retro.create({
+    data: {
+      workspaceId,
+      projectId,
+      sprintId: lastSprint?.id ?? null,
+      name: `${lastSprint?.name ?? "Sprint"} retro`,
+      phase: "discuss",
+      createdById: demoUserId,
+      columns: [
+        { id: "well", title: "Went well" },
+        { id: "improve", title: "To improve" },
+        { id: "actions", title: "Action items", actions: true },
+      ],
+    },
+  });
+  const card = (columnId: string, body: string, authorId: string) =>
+    db.retroCard.create({ data: { retroId: retro.id, columnId, body, authorId } });
+  const fast = await card(
+    "well",
+    "Code reviews were fast — most PRs merged the same day.",
+    priyaId,
+  );
+  await card("well", "The analytics SDK upgrade went out without incidents.", demoUserId);
+  const flaky = await card("improve", "Flaky checkout tests blocked deploys twice.", demoUserId);
+  await card("improve", "Too many meetings on Wednesday.", priyaId);
+  await card("actions", "Quarantine flaky tests and fix the top three this sprint.", priyaId);
+  await db.retroVote.createMany({
+    data: [
+      { cardId: flaky.id, userId: demoUserId },
+      { cardId: flaky.id, userId: priyaId },
+      { cardId: fast.id, userId: demoUserId },
+    ],
+  });
+
+  // Unestimated work for planning poker.
+  const unestimated = await db.issue.findMany({
+    where: {
+      projectId,
+      estimate: null,
+      type: { in: ["story", "task", "bug"] },
+      status: { category: { not: "done" } },
+    },
+    orderBy: { position: "asc" },
+    take: 4,
+    select: { id: true },
+  });
+  if (unestimated.length) {
+    await db.pokerSession.create({
+      data: {
+        workspaceId,
+        projectId,
+        name: "Backlog refinement",
+        deck: ["1", "2", "3", "5", "8", "13", "21", "?", "☕"],
+        queue: unestimated.map((i) => i.id),
+        currentIssueId: unestimated[0]!.id,
+        createdById: demoUserId,
+      },
+    });
+  }
 }
 
 async function main() {

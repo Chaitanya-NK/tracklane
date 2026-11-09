@@ -39,19 +39,19 @@ model User {
   sessions           Session[]
   accounts           Account[]
   memberships        WorkspaceMember[]
-  invitationsSent    WorkspaceInvitation[] @relation("InvitedBy")
-  workspacesCreated  Workspace[]           @relation("WorkspaceCreatedBy")
-  projectsLed        Project[]             @relation("ProjectLead")
-  projectsCreated    Project[]             @relation("ProjectCreatedBy")
-  issuesAssigned     Issue[]               @relation("IssueAssignee")
-  issuesReported     Issue[]               @relation("IssueReporter")
+  invitationsSent    WorkspaceInvitation[]    @relation("InvitedBy")
+  workspacesCreated  Workspace[]              @relation("WorkspaceCreatedBy")
+  projectsLed        Project[]                @relation("ProjectLead")
+  projectsCreated    Project[]                @relation("ProjectCreatedBy")
+  issuesAssigned     Issue[]                  @relation("IssueAssignee")
+  issuesReported     Issue[]                  @relation("IssueReporter")
   comments           Comment[]
   attachments        Attachment[]
   issueActivities    IssueActivity[]
   savedFilters       SavedFilter[]
   filterFavorites    FilterFavorite[]
-  approvalsRequested ApprovalRequest[]     @relation("ApprovalRequester")
-  approvalsDecided   ApprovalRequest[]     @relation("ApprovalDecider")
+  approvalsRequested ApprovalRequest[]        @relation("ApprovalRequester")
+  approvalsDecided   ApprovalRequest[]        @relation("ApprovalDecider")
   fieldValues        IssueFieldValue[]
   tqlFunctions       TqlFunction[]
   notifications      Notification[]           @relation("NotificationRecipient")
@@ -64,6 +64,15 @@ model User {
   goalsOwned         Goal[]
   issueLinksCreated  IssueLink[]
   automationRules    AutomationRule[]
+  docsCreated        Doc[]                    @relation("DocCreatedBy")
+  docsUpdated        Doc[]                    @relation("DocUpdatedBy")
+  docVersions        DocVersion[]
+  whiteboards        Whiteboard[]
+  retrosCreated      Retro[]
+  retroCards         RetroCard[]
+  retroVotes         RetroVote[]
+  pokerSessions      PokerSession[]
+  pokerVotes         PokerVote[]
 
   @@map("users")
 }
@@ -140,17 +149,21 @@ model Workspace {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  createdBy    User?                 @relation("WorkspaceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  members      WorkspaceMember[]
-  invitations  WorkspaceInvitation[]
-  projects     Project[]
-  issues       Issue[]
+  createdBy     User?                 @relation("WorkspaceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  members       WorkspaceMember[]
+  invitations   WorkspaceInvitation[]
+  projects      Project[]
+  issues        Issue[]
   savedFilters  SavedFilter[]
   tqlFunctions  TqlFunction[]
   resolutions   Resolution[]
   notifications Notification[]
   dashboards    Dashboard[]
   goals         Goal[]
+  docs          Doc[]
+  whiteboards   Whiteboard[]
+  retros        Retro[]
+  pokerSessions PokerSession[]
 
   @@map("workspaces")
 }
@@ -250,22 +263,26 @@ model Project {
   createdAt           DateTime    @default(now()) @map("created_at")
   updatedAt           DateTime    @updatedAt @map("updated_at")
 
-  workspace     Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  lead          User?                @relation("ProjectLead", fields: [leadId], references: [id], onDelete: SetNull)
-  createdBy     User?                @relation("ProjectCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  statuses      WorkflowStatus[]
-  issues        Issue[]
-  labels        Label[]
-  sprints       Sprint[]
-  transitions   WorkflowTransition[]
-  customFields  CustomField[]
-  snapshots     ProjectSnapshot[]
-  slaPolicies   SlaPolicy[]
+  workspace       Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  lead            User?                @relation("ProjectLead", fields: [leadId], references: [id], onDelete: SetNull)
+  createdBy       User?                @relation("ProjectCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  statuses        WorkflowStatus[]
+  issues          Issue[]
+  labels          Label[]
+  sprints         Sprint[]
+  transitions     WorkflowTransition[]
+  customFields    CustomField[]
+  snapshots       ProjectSnapshot[]
+  slaPolicies     SlaPolicy[]
   releases        Release[]
   automationRules AutomationRule[]
   recurringIssues RecurringIssue[]
   issueTypes      ProjectIssueType[]
-  backlogStatus WorkflowStatus?      @relation("ProjectBacklogStatus", fields: [backlogStatusId], references: [id], onDelete: SetNull)
+  docs            Doc[]
+  whiteboards     Whiteboard[]
+  retros          Retro[]
+  pokerSessions   PokerSession[]
+  backlogStatus   WorkflowStatus?      @relation("ProjectBacklogStatus", fields: [backlogStatusId], references: [id], onDelete: SetNull)
 
   @@unique([workspaceId, key])
   @@map("projects")
@@ -293,68 +310,69 @@ model WorkflowStatus {
 }
 
 model Issue {
-  id          String    @id @default(cuid())
+  id           String    @id @default(cuid())
   /// Denormalised from the project so cross-project queries ("assigned to me") stay cheap.
-  workspaceId String    @map("workspace_id")
-  projectId   String    @map("project_id")
+  workspaceId  String    @map("workspace_id")
+  projectId    String    @map("project_id")
   /// Sequential per project; the issue key is `${project.key}-${number}`.
-  number      Int
-  type        IssueType @default(task)
-  title       String
+  number       Int
+  type         IssueType @default(task)
+  title        String
   /// Markdown.
-  description String    @default("")
-  statusId    String    @map("status_id")
-  priority    Priority  @default(medium)
-  assigneeId  String?   @map("assignee_id")
-  reporterId  String?   @map("reporter_id")
+  description  String    @default("")
+  statusId     String    @map("status_id")
+  priority     Priority  @default(medium)
+  assigneeId   String?   @map("assignee_id")
+  reporterId   String?   @map("reporter_id")
   /// Epic for stories/tasks/bugs, or the parent of a subtask.
-  parentId    String?   @map("parent_id")
+  parentId     String?   @map("parent_id")
   /// Planned start (timeline). Due date is the planned end.
-  startDate   DateTime? @map("start_date") @db.Date
-  dueDate     DateTime? @map("due_date") @db.Date
+  startDate    DateTime? @map("start_date") @db.Date
+  dueDate      DateTime? @map("due_date") @db.Date
   /// Story points.
-  estimate    Int?
+  estimate     Int?
   /// Fix version: the release this issue ships in.
-  releaseId    String? @map("release_id")
+  releaseId    String?   @map("release_id")
   /// A project-defined type (Spike, Incident…) refining the base `type`.
-  customTypeId String? @map("custom_type_id")
+  customTypeId String?   @map("custom_type_id")
   /// Original time estimate, in minutes (time tracking).
-  timeEstimate Int?    @map("time_estimate")
+  timeEstimate Int?      @map("time_estimate")
   /// Rank within the project: one ordering shared by the board and the backlog.
-  position    Float     @default(0)
+  position     Float     @default(0)
   /// Null = in the backlog.
-  sprintId    String?   @map("sprint_id")
-  resolvedAt  DateTime? @map("resolved_at")
+  sprintId     String?   @map("sprint_id")
+  resolvedAt   DateTime? @map("resolved_at")
   /// How it was resolved (Fixed, Duplicate…). Set while the status is a Done one.
-  resolutionId String?  @map("resolution_id")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  resolutionId String?   @map("resolution_id")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
-  workspace   Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  resolution  Resolution?       @relation(fields: [resolutionId], references: [id], onDelete: SetNull)
-  watchers      IssueWatcher[]
-  notifications Notification[]
-  worklogs      Worklog[]
-  slaNotices    SlaNotice[]
-  release       Release?           @relation(fields: [releaseId], references: [id], onDelete: SetNull)
-  customType    ProjectIssueType?  @relation(fields: [customTypeId], references: [id], onDelete: SetNull)
-  goals         GoalIssue[]
-  linksOut      IssueLink[]        @relation("IssueLinkSource")
-  linksIn       IssueLink[]        @relation("IssueLinkTarget")
+  workspace      Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  resolution     Resolution?       @relation(fields: [resolutionId], references: [id], onDelete: SetNull)
+  watchers       IssueWatcher[]
+  notifications  Notification[]
+  worklogs       Worklog[]
+  slaNotices     SlaNotice[]
+  release        Release?          @relation(fields: [releaseId], references: [id], onDelete: SetNull)
+  customType     ProjectIssueType? @relation(fields: [customTypeId], references: [id], onDelete: SetNull)
+  goals          GoalIssue[]
+  linksOut       IssueLink[]       @relation("IssueLinkSource")
+  linksIn        IssueLink[]       @relation("IssueLinkTarget")
   automationRuns AutomationRun[]
-  project     Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  status      WorkflowStatus    @relation(fields: [statusId], references: [id], onDelete: Restrict)
-  assignee    User?             @relation("IssueAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
-  reporter    User?             @relation("IssueReporter", fields: [reporterId], references: [id], onDelete: SetNull)
-  parent      Issue?            @relation("IssueParent", fields: [parentId], references: [id], onDelete: SetNull)
-  sprint      Sprint?           @relation(fields: [sprintId], references: [id], onDelete: SetNull)
-  children    Issue[]           @relation("IssueParent")
-  labels      IssueLabel[]
-  comments    Comment[]
-  attachments Attachment[]
-  activities  IssueActivity[]
-  approvals   ApprovalRequest[]
-  fieldValues IssueFieldValue[]
+  retroCards     RetroCard[]
+  project        Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  status         WorkflowStatus    @relation(fields: [statusId], references: [id], onDelete: Restrict)
+  assignee       User?             @relation("IssueAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  reporter       User?             @relation("IssueReporter", fields: [reporterId], references: [id], onDelete: SetNull)
+  parent         Issue?            @relation("IssueParent", fields: [parentId], references: [id], onDelete: SetNull)
+  sprint         Sprint?           @relation(fields: [sprintId], references: [id], onDelete: SetNull)
+  children       Issue[]           @relation("IssueParent")
+  labels         IssueLabel[]
+  comments       Comment[]
+  attachments    Attachment[]
+  activities     IssueActivity[]
+  approvals      ApprovalRequest[]
+  fieldValues    IssueFieldValue[]
 
   @@unique([projectId, number])
   @@index([workspaceId, assigneeId])
@@ -481,6 +499,7 @@ model Sprint {
   project   Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
   issues    Issue[]
   snapshots ProjectSnapshot[]
+  retros    Retro[]
 
   @@index([projectId, state])
   @@map("sprints")
@@ -796,21 +815,21 @@ model PushSubscription {
 
 /// One row per project per day (UTC), written by the worker; feeds burndown and cumulative flow.
 model ProjectSnapshot {
-  id         String   @id @default(cuid())
-  projectId  String   @map("project_id")
-  date       DateTime @db.Date
+  id               String   @id @default(cuid())
+  projectId        String   @map("project_id")
+  date             DateTime @db.Date
   /// Issue counts per status id, e.g. {"st_1": 4}.
-  statusCounts Json   @map("status_counts")
-  todoCount       Int @default(0) @map("todo_count")
-  inProgressCount Int @default(0) @map("in_progress_count")
-  doneCount       Int @default(0) @map("done_count")
+  statusCounts     Json     @map("status_counts")
+  todoCount        Int      @default(0) @map("todo_count")
+  inProgressCount  Int      @default(0) @map("in_progress_count")
+  doneCount        Int      @default(0) @map("done_count")
   /// The active sprint that day, if any, and its points.
-  sprintId        String? @map("sprint_id")
-  sprintScope     Int     @default(0) @map("sprint_scope")
-  sprintRemaining Int     @default(0) @map("sprint_remaining")
-  sprintIssues    Int     @default(0) @map("sprint_issues")
-  sprintOpenIssues Int    @default(0) @map("sprint_open_issues")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  sprintId         String?  @map("sprint_id")
+  sprintScope      Int      @default(0) @map("sprint_scope")
+  sprintRemaining  Int      @default(0) @map("sprint_remaining")
+  sprintIssues     Int      @default(0) @map("sprint_issues")
+  sprintOpenIssues Int      @default(0) @map("sprint_open_issues")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   sprint  Sprint? @relation(fields: [sprintId], references: [id], onDelete: SetNull)
@@ -1105,4 +1124,173 @@ model ProjectIssueType {
 
   @@unique([projectId, name])
   @@map("project_issue_types")
+}
+
+/// A Markdown page, in the workspace or a project, optionally nested under another page.
+model Doc {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  projectId   String?  @map("project_id")
+  parentId    String?  @map("parent_id")
+  title       String
+  /// Markdown; ```mermaid blocks render as diagrams.
+  body        String   @default("")
+  /// Bumped on every save; saves name the version they started from to catch conflicts.
+  version     Int      @default(1)
+  position    Int      @default(0)
+  createdById String?  @map("created_by_id")
+  updatedById String?  @map("updated_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  workspace Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project   Project?     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parent    Doc?         @relation("DocTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Doc[]        @relation("DocTree")
+  createdBy User?        @relation("DocCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy User?        @relation("DocUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  versions  DocVersion[]
+
+  @@index([workspaceId, projectId])
+  @@index([parentId])
+  @@map("docs")
+}
+
+/// A saved earlier state of a doc (one per save).
+model DocVersion {
+  id        String   @id @default(cuid())
+  docId     String   @map("doc_id")
+  version   Int
+  title     String
+  body      String
+  authorId  String?  @map("author_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  doc    Doc   @relation(fields: [docId], references: [id], onDelete: Cascade)
+  author User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@unique([docId, version])
+  @@map("doc_versions")
+}
+
+model Whiteboard {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  projectId   String?  @map("project_id")
+  name        String
+  /// Excalidraw elements and the app state worth keeping (background colour).
+  scene       Json     @default("{}")
+  version     Int      @default(1)
+  createdById String?  @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project   Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@map("whiteboards")
+}
+
+enum RetroPhase {
+  brainstorm
+  vote
+  discuss
+  closed
+}
+
+model Retro {
+  id             String     @id @default(cuid())
+  workspaceId    String     @map("workspace_id")
+  projectId      String     @map("project_id")
+  sprintId       String?    @map("sprint_id")
+  name           String
+  phase          RetroPhase @default(brainstorm)
+  /// [{ id, title, actions?: true }] — cards in an `actions` column can become issues.
+  columns        Json
+  votesPerPerson Int        @default(5) @map("votes_per_person")
+  createdById    String?    @map("created_by_id")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  workspace Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sprint    Sprint?     @relation(fields: [sprintId], references: [id], onDelete: SetNull)
+  createdBy User?       @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  cards     RetroCard[]
+
+  @@index([workspaceId, projectId])
+  @@map("retros")
+}
+
+model RetroCard {
+  id        String   @id @default(cuid())
+  retroId   String   @map("retro_id")
+  columnId  String   @map("column_id")
+  authorId  String?  @map("author_id")
+  body      String
+  /// Set when an action item was turned into an issue.
+  issueId   String?  @map("issue_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  retro  Retro       @relation(fields: [retroId], references: [id], onDelete: Cascade)
+  author User?       @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  issue  Issue?      @relation(fields: [issueId], references: [id], onDelete: SetNull)
+  votes  RetroVote[]
+
+  @@index([retroId])
+  @@map("retro_cards")
+}
+
+model RetroVote {
+  cardId    String   @map("card_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  card RetroCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([cardId, userId])
+  @@map("retro_votes")
+}
+
+/// A planning-poker room: a queue of issues the team estimates together.
+model PokerSession {
+  id             String    @id @default(cuid())
+  workspaceId    String    @map("workspace_id")
+  projectId      String    @map("project_id")
+  name           String
+  /// Card values offered, e.g. ["1","2","3","5","8","13","?"].
+  deck           String[]
+  /// Issue ids, in the order they'll be estimated.
+  queue          String[]
+  currentIssueId String?   @map("current_issue_id")
+  revealed       Boolean   @default(false)
+  endedAt        DateTime? @map("ended_at")
+  createdById    String?   @map("created_by_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  workspace Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy User?       @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  votes     PokerVote[]
+
+  @@index([workspaceId, projectId])
+  @@map("poker_sessions")
+}
+
+model PokerVote {
+  sessionId String   @map("session_id")
+  issueId   String   @map("issue_id")
+  userId    String   @map("user_id")
+  value     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  session PokerSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([sessionId, issueId, userId])
+  @@map("poker_votes")
 }
