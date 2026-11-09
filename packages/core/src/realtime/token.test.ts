@@ -21,5 +21,7 @@ describe("realtime tokens", () => {
     expect(canJoinRoom(claims, "ws:w1:issue:abc")).toBe(true);
     expect(canJoinRoom(claims, "ws:w2:issue:abc")).toBe(false);
     expect(canJoinRoom(claims, "ws:w1:secret:abc")).toBe(false);
+    expect(canJoinRoom(claims, "ws:w1:whiteboard:b1")).toBe(true);
+    expect(canJoinRoom(claims, "ws:w2:poker:p1")).toBe(false);
   });
 });

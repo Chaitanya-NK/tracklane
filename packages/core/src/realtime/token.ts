@@ -72,6 +72,8 @@ export async function verifyRealtimeToken(
 /** Rooms a token may join: its own user room and anything inside its workspaces. */
 export function canJoinRoom(claims: RealtimeClaims, room: string) {
   if (room === `user:${claims.sub}`) return true;
-  const match = /^ws:([^:]+):(project|issue):[A-Za-z0-9_-]{1,64}$/.exec(room);
+  const match = /^ws:([^:]+):(project|issue|doc|whiteboard|retro|poker):[A-Za-z0-9_-]{1,64}$/.exec(
+    room,
+  );
   return Boolean(match && claims.ws.includes(match[1]!));
 }
