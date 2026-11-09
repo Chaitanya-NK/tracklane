@@ -13,6 +13,11 @@ const schema = z.object({
   /** Where the worker reaches the web app's internal endpoints (SLA checks). */
   INTERNAL_APP_URL: z.string().url().default("http://localhost:3000"),
   BETTER_AUTH_SECRET: z.string().min(32).optional(),
+  /** Let webhooks reach localhost and private networks (development only). */
+  WEBHOOK_ALLOW_PRIVATE_URLS: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
 });
 
 /** Validated environment. Fails fast at startup with a readable message. */
