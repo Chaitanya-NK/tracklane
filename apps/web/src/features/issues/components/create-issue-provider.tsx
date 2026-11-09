@@ -11,6 +11,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { dialogIsOpen, isTyping } from "@/lib/keyboard";
 import { CreateIssueDialog, type CreateIssueDefaults } from "./create-issue-dialog";
 
 interface CreateIssueContextValue {
@@ -18,18 +19,6 @@ interface CreateIssueContextValue {
 }
 
 const CreateIssueContext = createContext<CreateIssueContextValue | null>(null);
-
-/** True when a dialog is visible. Hidden routes (kept mounted by Next) may still hold closed ones. */
-function dialogIsOpen() {
-  return Array.from(
-    document.querySelectorAll<HTMLElement>("[role=dialog],[role=alertdialog]"),
-  ).some((el) => el.checkVisibility());
-}
-
-function isTyping(target: EventTarget | null) {
-  const el = target as HTMLElement | null;
-  return Boolean(el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)));
-}
 
 /**
  * One create-issue dialog per workspace. Anything inside can open it (sidebar, command menu,

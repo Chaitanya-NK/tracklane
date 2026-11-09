@@ -16,7 +16,7 @@ export const searchSelect = {
 export type SearchRow = Prisma.IssueGetPayload<{ select: typeof searchSelect }>;
 
 export type SearchResult =
-  | { ok: true; issues: SearchRow[]; total: number }
+  | { ok: true; issues: SearchRow[]; total: number; durationMs: number }
   | { ok: false; error: { message: string; position?: number; end?: number } };
 
 export const PAGE_SIZE = 50;
@@ -29,6 +29,7 @@ export async function searchIssues(input: {
   page?: number;
   pageSize?: number;
 }): Promise<SearchResult> {
+  const started = performance.now();
   const env = await loadTqlEnvironment(input.workspaceId, input.userId);
   const parsed = parseTql(input.query, env.parseOptions);
   if (!parsed.ok) {
@@ -60,7 +61,7 @@ export async function searchIssues(input: {
     }),
     db.issue.count({ where: compiled.where }),
   ]);
-  return { ok: true, issues, total };
+  return { ok: true, issues, total, durationMs: Math.round(performance.now() - started) };
 }
 
 /** A TQL query as a Prisma filter for the user (dashboards, reports). */

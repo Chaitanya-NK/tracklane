@@ -1,10 +1,18 @@
 "use client";
 
 import type { TqlCatalog } from "@tracklane/core";
-import { DownloadIcon, SaveIcon, SearchIcon } from "lucide-react";
+import {
+  CodeIcon,
+  DownloadIcon,
+  ListFilterIcon,
+  PlayIcon,
+  SaveIcon,
+  SearchIcon,
+} from "lucide-react";
 import type { Route } from "next";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
+import { ColumnsPicker } from "@/components/shared/columns-picker";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -17,15 +25,27 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { Spinner } from "@/components/ui/spinner";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useStoredState } from "@/hooks/use-stored-state";
+import { basicToTql, tqlToBasic } from "../basic";
 import { currentOrder, withOrderBy } from "../sort";
 import type { FilterSummary, SearchIssue } from "../types";
+import { BasicBuilder } from "./basic-builder";
 import { BulkBar } from "./bulk-bar";
-import { ResultsTable } from "./results-table";
+import { ShareMenu, SubscribeMenu } from "./filter-share";
+import { type ColumnId, DEFAULT_COLUMNS, OPTIONAL_COLUMNS, ResultsTable } from "./results-table";
 import { SaveFilterDialog } from "./save-filter-dialog";
-import { TqlEditor, TqlErrorPreview } from "./tql-editor";
+import { RunShortcut, TqlEditor, TqlErrorPreview, TqlHelpButton, TqlValidity } from "./tql-editor";
 
 export type SearchOutcome =
-  | { ok: true; issues: SearchIssue[]; total: number; page: number; pageSize: number }
+  | {
+      ok: true;
+      issues: SearchIssue[];
+      total: number;
+      page: number;
+      pageSize: number;
+      durationMs?: number;
+    }
   | { ok: false; error: { message: string; position?: number; end?: number } };
 
 /** Query editor, results, selection and bulk actions for the Filters page. */
@@ -39,6 +59,7 @@ export function SearchWorkspace({
   people,
   canBulkEdit,
   canDelete,
+  subscription = null,
 }: {
   slug: string;
   query: string;
@@ -49,6 +70,7 @@ export function SearchWorkspace({
   people: { id: string; name: string; image: string | null }[];
   canBulkEdit: boolean;
   canDelete: boolean;
+  subscription?: "daily" | "weekly" | null;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -68,6 +90,18 @@ export function SearchWorkspace({
 
   const dirty = draft.trim() !== query.trim();
   const order = currentOrder(query);
+  const [mode, setMode] = useStoredState<"basic" | "tql">("tl.search.mode", "tql");
+  const [columns, setColumns] = useStoredState<ColumnId[]>("tl.search.columns", DEFAULT_COLUMNS);
+  const parseOptions = useMemo(
+    () => ({
+      customFields: catalog.customFields,
+      issueTypes: catalog.issueTypes,
+      functions: catalog.functions,
+    }),
+    [catalog],
+  );
+  const basic = useMemo(() => tqlToBasic(query, parseOptions), [query, parseOptions]);
+  const showBasic = mode === "basic" && basic !== null;
 
   return (
     <div className="min-w-0 flex-1 space-y-4">
@@ -104,22 +138,75 @@ export function SearchWorkspace({
             </a>
           </Button>
         </ButtonGroup>
+        <ShareMenu slug={slug} filter={filter} />
+        <SubscribeMenu slug={slug} filter={filter} frequency={subscription} />
       </div>
 
-      <div className="flex gap-2">
-        <div className="min-w-0 flex-1">
-          <TqlEditor
-            value={draft}
-            onChange={setDraft}
-            onSubmit={(q) => run(q)}
-            catalog={catalog}
-            invalid={!outcome.ok}
-          />
+      <div className="space-y-2 rounded-lg border bg-card p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            value={showBasic ? "basic" : "tql"}
+            onValueChange={(value) => value && setMode(value as "basic" | "tql")}
+            aria-label="Query mode"
+          >
+            <ToggleGroupItem
+              value="basic"
+              disabled={basic === null}
+              title={basic === null ? "This query is too complex for Basic mode" : undefined}
+            >
+              <ListFilterIcon aria-hidden="true" /> Basic
+            </ToggleGroupItem>
+            <ToggleGroupItem value="tql">
+              <CodeIcon aria-hidden="true" /> TQL
+            </ToggleGroupItem>
+          </ToggleGroup>
+          {mode === "basic" && basic === null ? (
+            <span className="text-xs text-muted-foreground">
+              This query uses TQL the Basic builder can&apos;t show.
+            </span>
+          ) : null}
+          <span className="ml-auto">
+            <TqlHelpButton />
+          </span>
         </div>
-        <Button onClick={() => run(draft)} disabled={pending} className="h-10">
-          {pending ? <Spinner /> : <SearchIcon aria-hidden="true" />}
-          Search
-        </Button>
+        {showBasic ? (
+          <BasicBuilder
+            key={query}
+            value={basic}
+            catalog={catalog}
+            onChange={(next) => {
+              const q = basicToTql(next);
+              setDraft(q);
+              run(q);
+            }}
+          />
+        ) : (
+          <>
+            <TqlEditor
+              id="tql-query"
+              value={draft}
+              onChange={setDraft}
+              onSubmit={(q) => run(q)}
+              catalog={catalog}
+              invalid={!outcome.ok && !dirty}
+              lineNumbers
+              minLines={3}
+            />
+            <div className="flex flex-wrap items-center gap-3">
+              <TqlValidity query={draft} catalog={catalog} />
+              <span className="ml-auto flex items-center gap-3">
+                <RunShortcut />
+                <Button onClick={() => run(draft)} disabled={pending} size="sm">
+                  {pending ? <Spinner /> : <PlayIcon aria-hidden="true" />}
+                  Run
+                </Button>
+              </span>
+            </div>
+          </>
+        )}
       </div>
 
       {!outcome.ok ? (
@@ -142,12 +229,23 @@ export function SearchWorkspace({
         />
       ) : (
         <div className={pending ? "opacity-60 transition-opacity" : undefined} aria-busy={pending}>
-          <p className="mb-2 text-sm text-muted-foreground">
-            {outcome.total} issue{outcome.total === 1 ? "" : "s"}
-            {outcome.total > outcome.pageSize
-              ? ` · showing ${(outcome.page - 1) * outcome.pageSize + 1}–${Math.min(outcome.page * outcome.pageSize, outcome.total)}`
-              : ""}
-          </p>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <p className="text-sm text-muted-foreground">
+              {outcome.total} issue{outcome.total === 1 ? "" : "s"}
+              {outcome.total > outcome.pageSize
+                ? ` · showing ${(outcome.page - 1) * outcome.pageSize + 1}–${Math.min(outcome.page * outcome.pageSize, outcome.total)}`
+                : ""}
+              {outcome.durationMs !== undefined ? ` · ran in ${outcome.durationMs} ms` : ""}
+            </p>
+            <span className="ml-auto">
+              <ColumnsPicker
+                options={OPTIONAL_COLUMNS}
+                value={columns}
+                onChange={setColumns}
+                defaults={DEFAULT_COLUMNS}
+              />
+            </span>
+          </div>
           <ResultsTable
             slug={slug}
             issues={outcome.issues}
@@ -155,6 +253,7 @@ export function SearchWorkspace({
             selected={selected}
             onSelectedChange={setSelected}
             order={order}
+            columns={columns}
             onSort={(field, direction) => {
               const next = withOrderBy(query, field, direction);
               setDraft(next);

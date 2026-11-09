@@ -27,9 +27,26 @@ const COLUMNS = [
   { field: "status", label: "Status", className: "w-36" },
   { field: "assignee", label: "Assignee", className: "hidden w-40 md:table-cell" },
   { field: "priority", label: "P", name: "priority", className: "w-12" },
-  { field: "due", label: "Due", className: "hidden w-24 xl:table-cell" },
-  { field: "updated", label: "Updated", className: "hidden w-28 xl:table-cell" },
+  { field: "labels", label: "Labels", className: "hidden w-40 md:table-cell", unsortable: true },
+  { field: "points", label: "Pts", name: "points", className: "hidden w-14 md:table-cell" },
+  { field: "due", label: "Due", className: "hidden w-24 md:table-cell" },
+  { field: "updated", label: "Updated", className: "hidden w-28 md:table-cell" },
 ] as const;
+
+/** Columns the user can hide (key and summary always show). */
+export const OPTIONAL_COLUMNS = COLUMNS.slice(2).map((c) => ({
+  id: c.field,
+  label: "name" in c ? c.name[0]!.toUpperCase() + c.name.slice(1) : c.label,
+}));
+export type ColumnId = (typeof COLUMNS)[number]["field"];
+export const DEFAULT_COLUMNS: ColumnId[] = [
+  "project",
+  "status",
+  "assignee",
+  "priority",
+  "due",
+  "updated",
+];
 
 export function ResultsTable({
   slug,
@@ -39,6 +56,7 @@ export function ResultsTable({
   selectable,
   order,
   onSort,
+  columns = DEFAULT_COLUMNS,
 }: {
   slug: string;
   issues: SearchIssue[];
@@ -47,7 +65,10 @@ export function ResultsTable({
   selectable: boolean;
   order: { field: string; direction: "asc" | "desc" } | null;
   onSort: (field: string, direction: "asc" | "desc") => void;
+  columns?: ColumnId[];
 }) {
+  const shown = (field: ColumnId) =>
+    field === "key" || field === "summary" || columns.includes(field);
   const allSelected = issues.length > 0 && issues.every((i) => selected.has(i.id));
   const someSelected = issues.some((i) => selected.has(i.id));
 
@@ -73,28 +94,32 @@ export function ResultsTable({
                 />
               </TableHead>
             ) : null}
-            {COLUMNS.map((col) => {
+            {COLUMNS.filter((col) => shown(col.field)).map((col) => {
               const active = order?.field === col.field;
               return (
                 <TableHead key={col.field} className={col.className}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="-ml-2 h-7 px-2 font-medium"
-                    onClick={() =>
-                      onSort(col.field, active && order?.direction === "asc" ? "desc" : "asc")
-                    }
-                    aria-label={`Sort by ${"name" in col ? col.name : col.label.toLowerCase()}`}
-                  >
-                    {col.label}
-                    {active ? (
-                      order?.direction === "asc" ? (
-                        <ArrowUpIcon aria-hidden="true" />
-                      ) : (
-                        <ArrowDownIcon aria-hidden="true" />
-                      )
-                    ) : null}
-                  </Button>
+                  {"unsortable" in col ? (
+                    col.label
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="-ml-2 h-7 px-2 font-medium"
+                      onClick={() =>
+                        onSort(col.field, active && order?.direction === "asc" ? "desc" : "asc")
+                      }
+                      aria-label={`Sort by ${"name" in col ? col.name : col.label.toLowerCase()}`}
+                    >
+                      {col.label}
+                      {active ? (
+                        order?.direction === "asc" ? (
+                          <ArrowUpIcon aria-hidden="true" />
+                        ) : (
+                          <ArrowDownIcon aria-hidden="true" />
+                        )
+                      ) : null}
+                    </Button>
+                  )}
                 </TableHead>
               );
             })}
@@ -139,40 +164,66 @@ export function ResultsTable({
                   >
                     {issue.title}
                   </Link>
-                  <span className="hidden shrink-0 gap-1 2xl:flex">
+                  <span className={cn("hidden shrink-0 gap-1", !shown("labels") && "2xl:flex")}>
                     {issue.labels.slice(0, 2).map((label) => (
                       <LabelBadge key={label.id} label={label} />
                     ))}
                   </span>
                 </span>
               </TableCell>
-              <TableCell className="hidden truncate text-sm text-muted-foreground lg:table-cell">
-                {issue.project.name}
-              </TableCell>
-              <TableCell>
-                <StatusBadge status={issue.status} />
-              </TableCell>
-              <TableCell className="hidden md:table-cell">
-                {issue.assignee ? (
-                  <span className="flex items-center gap-2 text-sm">
-                    <UserAvatar user={issue.assignee} />
-                    <span className="truncate">{issue.assignee.name}</span>
+              {shown("project") ? (
+                <TableCell className="hidden truncate text-sm text-muted-foreground lg:table-cell">
+                  {issue.project.name}
+                </TableCell>
+              ) : null}
+              {shown("status") ? (
+                <TableCell>
+                  <StatusBadge status={issue.status} />
+                </TableCell>
+              ) : null}
+              {shown("assignee") ? (
+                <TableCell className="hidden md:table-cell">
+                  {issue.assignee ? (
+                    <span className="flex items-center gap-2 text-sm">
+                      <UserAvatar user={issue.assignee} />
+                      <span className="truncate">{issue.assignee.name}</span>
+                    </span>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">Unassigned</span>
+                  )}
+                </TableCell>
+              ) : null}
+              {shown("priority") ? (
+                <TableCell>
+                  <PriorityIcon priority={issue.priority} />
+                </TableCell>
+              ) : null}
+              {shown("labels") ? (
+                <TableCell className="hidden md:table-cell">
+                  <span className="flex gap-1">
+                    {issue.labels.slice(0, 3).map((label) => (
+                      <LabelBadge key={label.id} label={label} />
+                    ))}
                   </span>
-                ) : (
-                  <span className="text-sm text-muted-foreground">Unassigned</span>
-                )}
-              </TableCell>
-              <TableCell>
-                <PriorityIcon priority={issue.priority} />
-              </TableCell>
-              <TableCell className="hidden text-sm text-muted-foreground xl:table-cell">
-                {issue.dueDate
-                  ? formatDate(issue.dueDate, { day: "numeric", month: "short" })
-                  : "—"}
-              </TableCell>
-              <TableCell className="hidden text-sm text-muted-foreground xl:table-cell">
-                <TimeAgo date={issue.updatedAt} />
-              </TableCell>
+                </TableCell>
+              ) : null}
+              {shown("points") ? (
+                <TableCell className="hidden text-sm tabular-nums md:table-cell">
+                  {issue.estimate ?? "—"}
+                </TableCell>
+              ) : null}
+              {shown("due") ? (
+                <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
+                  {issue.dueDate
+                    ? formatDate(issue.dueDate, { day: "numeric", month: "short" })
+                    : "—"}
+                </TableCell>
+              ) : null}
+              {shown("updated") ? (
+                <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
+                  <TimeAgo date={issue.updatedAt} />
+                </TableCell>
+              ) : null}
             </TableRow>
           ))}
         </TableBody>

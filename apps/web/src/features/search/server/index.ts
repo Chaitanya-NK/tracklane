@@ -1,5 +1,5 @@
 export { issuesToCsv } from "./csv";
-export { getFilter, listFilters, type SavedFilterItem } from "./filters";
+export { getFilter, getSubscription, listFilters, type SavedFilterItem } from "./filters";
 export {
   getTqlCatalog,
   PAGE_SIZE,

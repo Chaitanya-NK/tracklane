@@ -4,15 +4,10 @@ import { Suspense } from "react";
 import { PageHeader } from "@/components/shared/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { listAssignableUsers } from "@/features/projects/server";
-import {
-  FilterList,
-  PRESET_FILTERS,
-  SearchWorkspace,
-  TqlReference,
-  type FilterSummary,
-} from "@/features/search";
+import { FilterList, PRESET_FILTERS, SearchWorkspace, type FilterSummary } from "@/features/search";
 import {
   getFilter,
+  getSubscription,
   getTqlCatalog,
   listFilters,
   PAGE_SIZE,
@@ -60,7 +55,10 @@ async function Filters({ params, searchParams }: Props) {
   const query = first(sp.q) ?? saved?.query ?? preset?.query ?? "";
   const title = active?.name ?? (first(sp.q) === undefined ? preset?.name : undefined) ?? "Search";
 
-  const result = await searchIssues({ workspaceId: workspace.id, userId: user.id, query, page });
+  const [result, subscription] = await Promise.all([
+    searchIssues({ workspaceId: workspace.id, userId: user.id, query, page }),
+    saved ? getSubscription(saved.id, user.id) : Promise.resolve(null),
+  ]);
   return (
     <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
       <aside className="lg:w-60 lg:shrink-0">
@@ -83,11 +81,13 @@ async function Filters({ params, searchParams }: Props) {
         people={people}
         canBulkEdit={can(role, "issues:update")}
         canDelete={can(role, "issues:delete")}
+        subscription={subscription?.frequency ?? null}
         outcome={
           result.ok
             ? {
                 ok: true,
                 total: result.total,
+                durationMs: result.durationMs,
                 page,
                 pageSize: PAGE_SIZE,
                 issues: result.issues.map((issue) => ({
@@ -134,7 +134,6 @@ export default function FiltersPage({ params, searchParams }: Props) {
       <Suspense fallback={<FiltersSkeleton />}>
         <Filters params={params} searchParams={searchParams} />
       </Suspense>
-      <TqlReference />
     </div>
   );
 }

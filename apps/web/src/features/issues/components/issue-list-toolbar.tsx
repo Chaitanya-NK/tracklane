@@ -40,6 +40,8 @@ import {
 } from "../filters";
 import { IssueTypeIcon, PriorityIcon } from "./issue-meta";
 
+const FILTER_KEYS = new Set(["q", "status", "assignee", "type", "priority", "sort"]);
+
 const SORT_LABELS: Record<IssueSort, string> = {
   updated: "Recently updated",
   created: "Recently created",
@@ -96,11 +98,15 @@ export function IssueListToolbar({
   const [q, setQ] = useState(filters.q);
 
   const apply = (next: Partial<IssueFilters>) =>
-    startTransition(() =>
-      router.replace(`${pathname}${serializeIssueFilters({ ...filters, ...next })}` as Route, {
-        scroll: false,
-      }),
-    );
+    startTransition(() => {
+      // Keep parameters the toolbar doesn't own (view, group, columns…).
+      const params = new URLSearchParams(serializeIssueFilters({ ...filters, ...next }).slice(1));
+      for (const [key, value] of searchParams) {
+        if (!FILTER_KEYS.has(key) && key !== "page") params.set(key, value);
+      }
+      const query = params.toString();
+      router.replace(`${pathname}${query ? `?${query}` : ""}` as Route, { scroll: false });
+    });
 
   // Debounce typing into the search box.
   useEffect(() => {

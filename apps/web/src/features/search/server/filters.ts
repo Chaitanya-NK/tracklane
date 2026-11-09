@@ -137,3 +137,33 @@ export async function toggleFavorite(input: {
   else await db.filterFavorite.create({ data: { filterId: input.filterId, userId: input.userId } });
   return { starred: !existing };
 }
+
+/** The user's digest subscription to a filter, if any. */
+export async function getSubscription(filterId: string, userId: string) {
+  return db.filterSubscription.findUnique({
+    where: { filterId_userId: { filterId, userId } },
+    select: { frequency: true, lastSentAt: true },
+  });
+}
+
+/** Subscribes the user to a visible filter's email digest, or unsubscribes (frequency null). */
+export async function setSubscription(input: {
+  workspaceId: string;
+  userId: string;
+  filterId: string;
+  frequency: "daily" | "weekly" | null;
+}) {
+  const filter = await getFilter(input.workspaceId, input.userId, input.filterId);
+  if (!filter) throw new AppError("not_found", "Filter not found");
+  const where = { filterId_userId: { filterId: filter.id, userId: input.userId } };
+  if (!input.frequency) {
+    await db.filterSubscription.deleteMany({ where: where.filterId_userId });
+    return null;
+  }
+  return db.filterSubscription.upsert({
+    where,
+    create: { filterId: filter.id, userId: input.userId, frequency: input.frequency },
+    update: { frequency: input.frequency },
+    select: { frequency: true },
+  });
+}

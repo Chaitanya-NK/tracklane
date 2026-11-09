@@ -8,8 +8,15 @@ import { getWorkspaceAccess } from "@/server/authz";
 import { authActionClient } from "@/server/safe-action";
 import { storage } from "@/server/storage";
 import { bulkDelete, bulkUpdate, MAX_BULK } from "./bulk";
-import { createFilter, deleteFilter, toggleFavorite, updateFilter } from "./filters";
+import {
+  createFilter,
+  deleteFilter,
+  setSubscription,
+  toggleFavorite,
+  updateFilter,
+} from "./filters";
 import { createTqlFunction, deleteTqlFunction, updateTqlFunction } from "./functions";
+import { issueContext, quickSearchIssues } from "./quick";
 import { getTqlCatalog } from "./search";
 
 const filterFields = {
@@ -156,4 +163,39 @@ export const deleteTqlFunctionAction = authActionClient
     const { workspace } = await getWorkspaceAccess(parsedInput.slug);
     await deleteTqlFunction(workspace.id, ctx.user.id, parsedInput.functionId);
     refresh();
+  });
+
+export const subscribeFilterAction = authActionClient
+  .inputSchema(
+    z.object({
+      slug: z.string(),
+      filterId: z.string(),
+      frequency: z.enum(["daily", "weekly"]).nullable(),
+    }),
+  )
+  .action(async ({ parsedInput, ctx }) => {
+    const { workspace } = await getWorkspaceAccess(parsedInput.slug);
+    const result = await setSubscription({
+      workspaceId: workspace.id,
+      userId: ctx.user.id,
+      filterId: parsedInput.filterId,
+      frequency: parsedInput.frequency,
+    });
+    refresh();
+    return result;
+  });
+
+export const quickSearchAction = authActionClient
+  .inputSchema(z.object({ slug: z.string(), q: z.string().max(100) }))
+  .action(async ({ parsedInput }) => {
+    const { workspace } = await getWorkspaceAccess(parsedInput.slug);
+    return quickSearchIssues(workspace.id, parsedInput.q);
+  });
+
+export const issueContextAction = authActionClient
+  .inputSchema(z.object({ slug: z.string(), issueKey: z.string().max(40) }))
+  .action(async ({ parsedInput, ctx }) => {
+    const { workspace } = await getWorkspaceAccess(parsedInput.slug);
+    const issue = await issueContext(workspace.id, parsedInput.issueKey);
+    return issue ? { ...issue, userId: ctx.user.id } : null;
   });
