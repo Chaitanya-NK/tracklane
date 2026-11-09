@@ -9,6 +9,7 @@ export type FieldKind =
   | "user"
   | "label"
   | "sprint"
+  | "resolution"
   | "issue"
   | "text"
   | "date"
@@ -134,6 +135,14 @@ export const TQL_FIELDS: FieldDef[] = [
     description: "Sprint name",
     operators: [...EQ, ...EMPTY],
     functions: ["openSprints", "activeSprint", "futureSprints", "closedSprints"],
+    sortable: false,
+  },
+  {
+    name: "resolution",
+    aliases: [],
+    kind: "resolution",
+    description: "How a resolved issue was closed (Fixed, Duplicate…)",
+    operators: [...EQ, ...EMPTY],
     sortable: false,
   },
   {

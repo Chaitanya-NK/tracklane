@@ -17,6 +17,8 @@ export interface TqlCatalog {
   users: { name: string; email: string }[];
   labels: string[];
   sprints: string[];
+  /** Resolution names, for resolution = … */
+  resolutions?: string[];
   /** Custom fields across the workspace's projects. */
   customFields?: TqlCustomFieldSignature[];
   /** Workspace-defined functions (Settings → TQL functions). */
@@ -73,6 +75,8 @@ function valueSuggestions(field: FieldDef, catalog: TqlCatalog): TqlSuggestion[]
       return catalog.labels.map((l) => v(l));
     case "sprint":
       return [...functions, ...catalog.sprints.map((s) => v(s))];
+    case "resolution":
+      return (catalog.resolutions ?? []).map((r) => v(r));
     case "option":
       return (field.custom?.options ?? []).map((o) => v(o));
     case "boolean":
