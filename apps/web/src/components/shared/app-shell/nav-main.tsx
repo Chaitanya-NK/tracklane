@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { useParams, usePathname } from "next/navigation";
 import {
   SidebarGroup,
@@ -22,11 +23,13 @@ function NavGroup({
   slug,
   activeSegment,
   className,
+  badges,
 }: {
   items: NavItem[];
   slug: string;
   activeSegment: string | undefined;
   className?: string;
+  badges?: Partial<Record<string, ReactNode>>;
 }) {
   return (
     <SidebarGroup className={className}>
@@ -44,6 +47,7 @@ function NavGroup({
                   <span>{item.title}</span>
                 </Link>
               </SidebarMenuButton>
+              {badges?.[item.segment]}
             </SidebarMenuItem>
           ))}
         </SidebarMenu>
@@ -52,14 +56,15 @@ function NavGroup({
   );
 }
 
-export function NavMain() {
+/** `badges` are server-rendered extras keyed by segment (e.g. the inbox unread count). */
+export function NavMain({ badges }: { badges?: Partial<Record<string, ReactNode>> }) {
   const pathname = usePathname();
   const { workspace } = useParams<{ workspace: string }>();
   const active = findNavItem(pathname)?.segment;
 
   return (
     <>
-      <NavGroup items={primaryNav} slug={workspace} activeSegment={active} />
+      <NavGroup items={primaryNav} slug={workspace} activeSegment={active} badges={badges} />
       <NavGroup items={secondaryNav} slug={workspace} activeSegment={active} className="mt-auto" />
     </>
   );

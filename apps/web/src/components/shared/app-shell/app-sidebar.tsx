@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/sidebar";
 import { CommandMenu } from "./command-menu";
 import { CreateIssueMenuButton } from "./create-issue-menu-button";
+import { InboxBadge } from "@/features/notifications/server";
 import { NavMain } from "./nav-main";
 import { UserNav, UserNavFallback } from "./user-nav";
 import { WorkspaceSwitcher, WorkspaceSwitcherFallback } from "./workspace-switcher";
@@ -45,7 +46,15 @@ export function AppSidebar({ params }: { params: Promise<{ workspace: string }> 
             </SidebarGroup>
           }
         >
-          <NavMain />
+          <NavMain
+            badges={{
+              inbox: (
+                <Suspense fallback={null}>
+                  <InboxBadge params={params} />
+                </Suspense>
+              ),
+            }}
+          />
         </Suspense>
       </SidebarContent>
       <SidebarFooter>

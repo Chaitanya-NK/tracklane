@@ -1,6 +1,6 @@
 import "server-only";
 import { db } from "@tracklane/db";
-import { resetPasswordEmail, sendEmail } from "@tracklane/email";
+import { resetPasswordEmail, sendEmail, verifyEmailEmail } from "@tracklane/email";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
@@ -39,8 +39,17 @@ export const auth = betterAuth({
     minPasswordLength: 8,
     maxPasswordLength: 128,
     revokeSessionsOnPasswordReset: true,
+    // Off by default so local setups without email still work; see REQUIRE_EMAIL_VERIFICATION.
+    requireEmailVerification: env.REQUIRE_EMAIL_VERIFICATION,
     sendResetPassword: async ({ user, url }) => {
       await sendEmail(user.email, resetPasswordEmail({ name: user.name, url }));
+    },
+  },
+  emailVerification: {
+    sendOnSignUp: true,
+    autoSignInAfterVerification: true,
+    sendVerificationEmail: async ({ user, url }) => {
+      await sendEmail(user.email, verifyEmailEmail({ name: user.name, url }));
     },
   },
   socialProviders: {

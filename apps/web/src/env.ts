@@ -21,10 +21,19 @@ export const env = createEnv({
     GOOGLE_CLIENT_SECRET: z.string().optional(),
     STORAGE_DIR: z.string().default(".data/uploads"),
     MAX_UPLOAD_MB: z.coerce.number().int().min(1).max(500).default(10),
+    /** Where the web server reaches the realtime server (proxied at /api/realtime). */
+    REALTIME_INTERNAL_URL: z.string().url().default("http://localhost:4001"),
+    /** Require a verified email before using the app. Off by default. */
+    REQUIRE_EMAIL_VERIFICATION: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((v) => v === "true"),
   },
   client: {
     NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
     NEXT_PUBLIC_REALTIME_URL: z.string().url().default("http://localhost:4001"),
+    /** Web Push public key (setup.sh generates the pair). Push is off when it's missing. */
+    NEXT_PUBLIC_VAPID_PUBLIC_KEY: z.string().optional(),
   },
   runtimeEnv: {
     NODE_ENV: process.env.NODE_ENV,
@@ -38,6 +47,9 @@ export const env = createEnv({
     MAX_UPLOAD_MB: process.env.MAX_UPLOAD_MB,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     NEXT_PUBLIC_REALTIME_URL: process.env.NEXT_PUBLIC_REALTIME_URL,
+    NEXT_PUBLIC_VAPID_PUBLIC_KEY: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    REALTIME_INTERNAL_URL: process.env.REALTIME_INTERNAL_URL,
+    REQUIRE_EMAIL_VERIFICATION: process.env.REQUIRE_EMAIL_VERIFICATION,
   },
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,
   emptyStringAsUndefined: true,

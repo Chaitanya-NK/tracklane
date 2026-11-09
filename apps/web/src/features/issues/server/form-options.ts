@@ -13,7 +13,7 @@ export async function loadIssueFormOptions(input: {
   role: WorkspaceRole;
   userId: string;
 }): Promise<IssueFormOptions> {
-  const [statuses, assignees, labels, parents, sprints, transitions, customFields] =
+  const [statuses, assignees, labels, parents, sprints, transitions, customFields, resolutions] =
     await Promise.all([
       listStatuses(input.project.id),
       listAssignableUsers(input.workspaceId),
@@ -27,6 +27,11 @@ export async function loadIssueFormOptions(input: {
       input.project.type === "scrum" ? listOpenSprints(input.project.id) : Promise.resolve([]),
       getTransitionRules(input.project.id),
       listCustomFields(input.project.id),
+      db.resolution.findMany({
+        where: { workspaceId: input.workspaceId },
+        orderBy: { position: "asc" },
+        select: { id: true, name: true, description: true, isDefault: true },
+      }),
     ]);
   return {
     project: {
@@ -42,6 +47,7 @@ export async function loadIssueFormOptions(input: {
     parents,
     transitions,
     customFields,
+    resolutions,
     currentUserId: input.userId,
     canCreate: can(input.role, "issues:create"),
     canEdit: can(input.role, "issues:update"),

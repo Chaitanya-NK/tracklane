@@ -1,5 +1,5 @@
 import type { Components } from "react-markdown";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
 
@@ -8,16 +8,19 @@ import { cn } from "@/lib/utils";
  * can't inject markup or scripts; links open in a new tab without referrer.
  */
 const components: Components = {
-  a: ({ href, children }) => (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer nofollow"
-      className="font-medium text-primary underline underline-offset-4"
-    >
-      {children}
-    </a>
-  ),
+  a: ({ href, children }) =>
+    href?.startsWith("user:") ? (
+      <span className="rounded bg-primary/10 px-1 py-0.5 font-medium text-primary">{children}</span>
+    ) : (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer nofollow"
+        className="font-medium text-primary underline underline-offset-4"
+      >
+        {children}
+      </a>
+    ),
   h1: ({ children }) => <h3 className="mt-4 text-lg font-semibold first:mt-0">{children}</h3>,
   h2: ({ children }) => <h4 className="mt-4 text-base font-semibold first:mt-0">{children}</h4>,
   h3: ({ children }) => <h5 className="mt-3 font-semibold first:mt-0">{children}</h5>,
@@ -54,11 +57,24 @@ const components: Components = {
     ) : null,
 };
 
+/** @[Name](user:id) → a link labelled "@Name" that renders as a mention chip. */
+const withMentions = (markdown: string) =>
+  markdown.replace(/@\[([^\]\n]{1,80})\]\(user:([A-Za-z0-9_-]{1,64})\)/g, "[@$1](user:$2)");
+
+/** Keeps mention links (user:…); everything else goes through react-markdown's safe default. */
+const urlTransform = (url: string) =>
+  /^user:[A-Za-z0-9_-]+$/.test(url) ? url : defaultUrlTransform(url);
+
 export function Markdown({ children, className }: { children: string; className?: string }) {
   return (
     <div className={cn("text-sm break-words", className)}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components} skipHtml>
-        {children}
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={components}
+        urlTransform={urlTransform}
+        skipHtml
+      >
+        {withMentions(children)}
       </ReactMarkdown>
     </div>
   );

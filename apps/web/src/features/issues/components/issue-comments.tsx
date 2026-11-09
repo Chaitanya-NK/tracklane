@@ -6,7 +6,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { Markdown } from "@/components/shared/markdown";
-import { MarkdownEditor } from "@/components/shared/markdown-editor";
+import { MarkdownEditor, type MentionUser } from "@/components/shared/markdown-editor";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import { Button } from "@/components/ui/button";
 import { addCommentAction, deleteCommentAction, updateCommentAction } from "../server/actions";
@@ -20,7 +20,15 @@ export interface CommentItem {
   author: { id: string; name: string; image: string | null } | null;
 }
 
-function Comment({ comment, canManage }: { comment: CommentItem; canManage: boolean }) {
+function Comment({
+  comment,
+  canManage,
+  mentionUsers,
+}: {
+  comment: CommentItem;
+  canManage: boolean;
+  mentionUsers: MentionUser[];
+}) {
   const [editing, setEditing] = useState(false);
   const [body, setBody] = useState(comment.body);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -56,6 +64,7 @@ function Comment({ comment, canManage }: { comment: CommentItem; canManage: bool
               onChange={setBody}
               rows={4}
               autoFocus
+              mentionUsers={mentionUsers}
               aria-label="Edit comment"
               onSubmit={() => update.execute({ commentId: comment.id, body })}
             />
@@ -118,12 +127,15 @@ export function IssueComments({
   currentUser,
   canComment,
   canModerate,
+  mentionUsers = [],
 }: {
   issueId: string;
   comments: CommentItem[];
   currentUser: { id: string; name: string; image: string | null };
   canComment: boolean;
   canModerate: boolean;
+  /** Workspace members offered after typing @. */
+  mentionUsers?: MentionUser[];
 }) {
   const [body, setBody] = useState("");
   const add = useAction(addCommentAction, {
@@ -145,8 +157,10 @@ export function IssueComments({
               value={body}
               onChange={setBody}
               rows={3}
-              placeholder="Add a comment… (Ctrl+Enter to send)"
+              placeholder="Add a comment… (@ to mention, Ctrl+Enter to send)"
               onSubmit={submit}
+              mentionUsers={mentionUsers}
+              id="new-comment"
               aria-label="New comment"
             />
             {body.trim() ? (
@@ -164,6 +178,7 @@ export function IssueComments({
         <ol className="space-y-5">
           {[...comments].reverse().map((comment) => (
             <Comment
+              mentionUsers={mentionUsers}
               key={comment.id}
               comment={comment}
               canManage={canModerate || (canComment && comment.author?.id === currentUser.id)}

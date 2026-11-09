@@ -14,6 +14,7 @@ const base: IssueSnapshot = {
   parent: null,
   labels: ["auth", "web"],
   sprint: null,
+  resolution: null,
 };
 
 describe("diffIssue", () => {

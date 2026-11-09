@@ -29,6 +29,9 @@ import {
 } from "@/features/issues";
 import { getIssueFieldValues } from "@/features/custom-fields/server";
 import { ProjectAvatar } from "@/features/projects";
+import { LiveRefresh, liveRooms, Viewers } from "@/components/shared/realtime";
+import { WatchButton } from "@/features/notifications";
+import { getWatchState } from "@/features/notifications/server";
 import { ApprovalBanner } from "@/features/workflow";
 import { getPendingApproval } from "@/features/workflow/server";
 import { getIssueByKey, listActivity, listAttachments, listComments } from "./queries";
@@ -67,19 +70,21 @@ export async function IssueView({
   if (!issue) notFound();
 
   const key = formatIssueKey(issue.project.key, issue.number);
-  const [options, comments, attachments, activity, fieldValues, approval] = await Promise.all([
-    loadIssueFormOptions({
-      workspaceId: workspace.id,
-      project: issue.project,
-      role,
-      userId: user.id,
-    }),
-    listComments(issue.id),
-    listAttachments(issue.id),
-    listActivity(issue.id),
-    getIssueFieldValues(issue.id),
-    getPendingApproval(issue.id),
-  ]);
+  const [options, comments, attachments, activity, fieldValues, approval, watch] =
+    await Promise.all([
+      loadIssueFormOptions({
+        workspaceId: workspace.id,
+        project: issue.project,
+        role,
+        userId: user.id,
+      }),
+      listComments(issue.id),
+      listAttachments(issue.id),
+      listActivity(issue.id),
+      getIssueFieldValues(issue.id),
+      getPendingApproval(issue.id),
+      getWatchState(issue.id, user.id),
+    ]);
   const canEdit = can(role, "issues:update");
   const childLabel = issue.type === "epic" ? "Issues in this epic" : "Subtasks";
   const canHaveChildren = issue.type !== "subtask";
@@ -139,7 +144,10 @@ export async function IssueView({
                   </BreadcrumbItem>
                 </BreadcrumbList>
               </Breadcrumb>
-              <div className="ml-auto">
+              <div className="ml-auto flex items-center gap-1">
+                <LiveRefresh rooms={[liveRooms.issue(issue.workspaceId, issue.id)]} />
+                <Viewers room={liveRooms.issue(issue.workspaceId, issue.id)} />
+                <WatchButton issueId={issue.id} watching={watch.watching} count={watch.count} />
                 <IssueActionsMenu
                   slug={slug}
                   issueId={issue.id}
@@ -212,6 +220,7 @@ export async function IssueView({
                 currentUser={user}
                 canComment={can(role, "comments:create")}
                 canModerate={can(role, "comments:moderate")}
+                mentionUsers={options.assignees}
               />
             </TabsContent>
             <TabsContent value="history" className="pt-4">
@@ -245,6 +254,7 @@ export async function IssueView({
                   createdAt: issue.createdAt,
                   updatedAt: issue.updatedAt,
                   resolvedAt: issue.resolvedAt,
+                  resolutionId: issue.resolutionId,
                   hasChildren: issue.children.length > 0,
                   fieldValues,
                 }}

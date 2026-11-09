@@ -23,6 +23,20 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   devIndicators: { position: "bottom-right" },
   allowedDevOrigins: isDev ? ["localhost", "127.0.0.1", ...forwardedHosts] : [],
+  // The realtime server (Socket.IO) is reached through this origin, so it works wherever the
+  // web app does (Codespaces port forwarding, a single public port in production).
+  async rewrites() {
+    return {
+      beforeFiles: [
+        {
+          source: "/api/realtime",
+          destination: `${process.env.REALTIME_INTERNAL_URL ?? "http://localhost:4001"}/api/realtime`,
+        },
+      ],
+      afterFiles: [],
+      fallback: [],
+    };
+  },
   experimental: {
     serverActions: { allowedOrigins: devHosts },
   },

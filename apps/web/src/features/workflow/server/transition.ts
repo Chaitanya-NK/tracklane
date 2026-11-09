@@ -1,6 +1,7 @@
 import "server-only";
 import { AppError, canApprove, decideTransition, type WorkspaceRole } from "@tracklane/core";
 import type { Prisma } from "@tracklane/db";
+import { actorName, approverIds, issueLabel, notify } from "@/features/notifications/server/notify";
 
 type Tx = Prisma.TransactionClient;
 
@@ -88,6 +89,20 @@ export async function gateStatusChange(
       fromValue: name(input.issue.statusId) ?? null,
       toValue: name(input.toStatusId) ?? null,
     },
+  });
+  const [label, actor, approvers] = await Promise.all([
+    issueLabel(tx, input.issue.id),
+    actorName(tx, input.userId),
+    approverIds(tx, input.issue.workspaceId, decision.approverRole),
+  ]);
+  await notify(tx, {
+    type: "approval_requested",
+    workspaceId: input.issue.workspaceId,
+    issueId: input.issue.id,
+    actorId: input.userId,
+    recipientIds: approvers,
+    title: `${actor} asked to move ${label.key} to ${name(input.toStatusId) ?? "a new status"}`,
+    body: label.title,
   });
   return {
     kind: "approval",

@@ -15,6 +15,7 @@ export interface IssueSnapshot {
   parent: string | null;
   labels: string[];
   sprint: string | null;
+  resolution: string | null;
 }
 
 export interface ActivityChange {

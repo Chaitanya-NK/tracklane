@@ -8,6 +8,7 @@ import {
 } from "@tracklane/core";
 import { db } from "@tracklane/db";
 import { updateIssue } from "@/features/issues/server/service";
+import { actorName, notify } from "@/features/notifications/server/notify";
 
 const requestSelect = {
   id: true,
@@ -148,6 +149,21 @@ export async function decideApproval(input: {
       });
       throw error;
     }
+  }
+  if (request.requestedById) {
+    const actor = await actorName(db, input.userId);
+    await notify(db, {
+      type: "approval_decided",
+      workspaceId: request.issue.workspaceId,
+      issueId: request.issueId,
+      actorId: input.userId,
+      recipientIds: [request.requestedById],
+      title:
+        input.decision === "approve"
+          ? `${actor} approved moving ${key} to ${request.to.name}`
+          : `${actor} rejected moving ${key} to ${request.to.name}`,
+      body: input.note,
+    });
   }
   await db.issueActivity.create({
     data: {

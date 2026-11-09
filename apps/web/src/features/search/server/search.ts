@@ -65,7 +65,7 @@ export async function searchIssues(input: {
 
 /** Real values in the workspace, for TQL autocomplete. */
 export async function getTqlCatalog(workspaceId: string, userId: string): Promise<TqlCatalog> {
-  const [projects, statuses, members, labels, sprints, env] = await Promise.all([
+  const [projects, statuses, members, labels, sprints, resolutions, env] = await Promise.all([
     db.project.findMany({
       where: { workspaceId, archivedAt: null },
       orderBy: { key: "asc" },
@@ -94,6 +94,11 @@ export async function getTqlCatalog(workspaceId: string, userId: string): Promis
       take: 50,
       select: { name: true },
     }),
+    db.resolution.findMany({
+      where: { workspaceId },
+      orderBy: { position: "asc" },
+      select: { name: true },
+    }),
     loadTqlEnvironment(workspaceId, userId),
   ]);
   return {
@@ -105,5 +110,6 @@ export async function getTqlCatalog(workspaceId: string, userId: string): Promis
     users: members.map((m) => m.user),
     labels: labels.map((l) => l.name),
     sprints: sprints.map((s) => s.name),
+    resolutions: resolutions.map((r) => r.name),
   };
 }

@@ -164,6 +164,8 @@ function equals(field: string, value: TqlValue, ctx: CompileContext): Where {
     case "sprint":
       if (value.kind === "function") return SPRINT_FUNCTIONS[value.name]!;
       return { sprint: { name: ci(literal(value)) } };
+    case "resolution":
+      return { resolution: { name: ci(literal(value)) } };
     case "parent":
       return { parent: issueRef(literal(value)) };
     case "points":
@@ -191,6 +193,7 @@ const EMPTY: Record<string, Where> = {
   description: { description: "" },
   points: { estimate: null },
   resolved: { resolvedAt: null },
+  resolution: { resolutionId: null },
   due: { dueDate: null },
   start: { startDate: null },
 };

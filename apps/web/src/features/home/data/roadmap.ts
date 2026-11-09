@@ -40,8 +40,7 @@ export const roadmap: RoadmapPhase[] = [
   {
     phase: 6,
     title: "Notifications & realtime",
-    summary: "Inbox, email, push, live presence",
-    carryOver: ["Email verification for new accounts"],
+    summary: "Inbox, mentions, watchers, email and push, live updates, presence, resolutions",
   },
   { phase: 7, title: "Reports & time", summary: "Burndown, velocity, dashboards, SLAs" },
   {
@@ -56,4 +55,4 @@ export const roadmap: RoadmapPhase[] = [
   { phase: 12, title: "Hardening", summary: "Audit log, SSO, i18n, accessibility, PWA" },
 ];
 
-export const CURRENT_PHASE = 5;
+export const CURRENT_PHASE = 6;

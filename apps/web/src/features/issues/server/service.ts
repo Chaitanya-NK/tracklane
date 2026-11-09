@@ -11,6 +11,12 @@ import {
   type Priority,
 } from "@tracklane/core";
 import { db, type Prisma } from "@tracklane/db";
+import {
+  onCommentAdded,
+  onIssueCreated,
+  onIssueUpdated,
+} from "@/features/notifications/server/issue-events";
+import { defaultResolutionId, resolutionFields } from "@/features/resolutions/server/apply";
 import { type FieldValueInput, writeFieldValues } from "@/features/custom-fields/server/values";
 import { gateStatusChange, type StatusChange } from "@/features/workflow/server/transition";
 import { assertWorkspacePermission } from "@/server/authz";
@@ -35,6 +41,8 @@ const snapshotSelect = {
   parentId: true,
   sprintId: true,
   resolvedAt: true,
+  resolutionId: true,
+  resolution: { select: { name: true } },
   project: { select: { key: true } },
   status: { select: { name: true, category: true } },
   assignee: { select: { name: true } },
@@ -62,6 +70,7 @@ function snapshot(issue: IssueRow): IssueSnapshot {
     parent: issue.parent ? formatIssueKey(issue.project.key, issue.parent.number) : null,
     labels: issue.labels.map((l) => l.label.name),
     sprint: issue.sprint?.name ?? null,
+    resolution: issue.resolution?.name ?? null,
   };
 }
 
@@ -232,7 +241,12 @@ export async function createIssue(input: CreateIssueInput) {
                   })
                 )?.sprintId ?? null)
               : null,
-        resolvedAt: status.category === "done" ? new Date() : null,
+        ...(status.category === "done"
+          ? {
+              resolvedAt: new Date(),
+              resolutionId: await defaultResolutionId(tx, input.workspaceId),
+            }
+          : {}),
         labels: input.labelIds?.length
           ? { create: [...new Set(input.labelIds)].map((labelId) => ({ labelId })) }
           : undefined,
@@ -240,6 +254,16 @@ export async function createIssue(input: CreateIssueInput) {
       },
       select: { id: true, number: true },
     });
+    await onIssueCreated(
+      tx,
+      {
+        id: issue.id,
+        workspaceId: input.workspaceId,
+        projectId: project.id,
+        assigneeId: input.assigneeId ?? null,
+      },
+      input.userId,
+    );
     await writeFieldValues(tx, {
       issueId: issue.id,
       projectId: project.id,
@@ -266,6 +290,8 @@ export interface IssuePatch {
   estimate?: number | null;
   labelIds?: string[];
   sprintId?: string | null;
+  /** Only for issues in (or moving to) a Done status; defaults to the workspace default. */
+  resolutionId?: string;
 }
 
 export async function updateIssue(input: {
@@ -309,10 +335,23 @@ export async function updateIssue(input: {
         userId: input.userId,
       });
       // Waiting for approval: everything else in the patch still applies.
-      if (statusChange.kind === "approval") delete patch.statusId;
+      if (statusChange.kind === "approval") {
+        delete patch.statusId;
+        // The resolution is picked again (or defaulted) when the move is approved.
+        delete patch.resolutionId;
+      }
     }
 
-    const resolvedAt = await resolvedAtFor(tx, before, patch.statusId);
+    const resolution = await resolutionFields(tx, {
+      workspaceId: before.workspaceId,
+      before: {
+        statusId: before.statusId,
+        category: before.status.category,
+        resolutionId: before.resolutionId,
+      },
+      nextStatusId: patch.statusId,
+      resolutionId: patch.resolutionId,
+    });
     const nextStart =
       patch.startDate !== undefined ? patch.startDate : toDateString(before.startDate);
     const nextDue = patch.dueDate !== undefined ? patch.dueDate : toDateString(before.dueDate);
@@ -331,7 +370,7 @@ export async function updateIssue(input: {
         priority: patch.priority,
         statusId: patch.statusId,
         sprintId: patch.sprintId,
-        resolvedAt,
+        ...resolution,
         assigneeId: patch.assigneeId,
         parentId: patch.parentId,
         estimate: patch.estimate,
@@ -369,23 +408,11 @@ export async function updateIssue(input: {
 }
 
 /** resolvedAt follows the status category: set when entering "done", cleared when leaving it. */
-async function resolvedAtFor(tx: Tx, before: IssueRow, statusId: string | undefined) {
-  if (!statusId || statusId === before.statusId) return undefined;
-  const status = await tx.workflowStatus.findUniqueOrThrow({
-    where: { id: statusId },
-    select: { category: true },
-  });
-  const wasDone = before.status.category === "done";
-  const isDone = status.category === "done";
-  if (isDone && !wasDone) return new Date();
-  if (!isDone && wasDone) return null;
-  return undefined;
-}
-
 /** Writes one history row per changed field. Returns how many fields changed. */
 async function recordChanges(tx: Tx, before: IssueRow, actorId: string) {
   const after = await loadIssue(tx, before.id);
   const changes = diffIssue(snapshot(before), snapshot(after));
+  if (changes.length) await onIssueUpdated(tx, before, after, actorId);
   if (changes.length) {
     await tx.issueActivity.createMany({
       data: changes.map((change) => ({
@@ -455,6 +482,8 @@ export interface MoveIssueInput {
   assigneeId?: string | null;
   priority?: Priority;
   parentId?: string | null;
+  /** When the move enters a Done status (resolve dialog). */
+  resolutionId?: string;
 }
 
 /**
@@ -517,7 +546,16 @@ export async function moveIssue(input: MoveIssueInput) {
         priority: input.priority,
         parentId: input.parentId,
         position: position ?? undefined,
-        resolvedAt: await resolvedAtFor(tx, before, statusId),
+        ...(await resolutionFields(tx, {
+          workspaceId: before.workspaceId,
+          before: {
+            statusId: before.statusId,
+            category: before.status.category,
+            resolutionId: before.resolutionId,
+          },
+          nextStatusId: statusId,
+          resolutionId: statusId ? input.resolutionId : undefined,
+        })),
       },
     });
     if (input.sprintId !== undefined && input.sprintId !== before.sprintId) {
@@ -565,11 +603,12 @@ export async function addComment(input: { issueId: string; userId: string; body:
   return db.$transaction(async (tx) => {
     const comment = await tx.comment.create({
       data: { issueId: input.issueId, authorId: input.userId, body: input.body },
-      select: { id: true },
+      select: { id: true, issue: { select: { id: true, workspaceId: true, projectId: true } } },
     });
     await tx.issueActivity.create({
       data: { issueId: input.issueId, actorId: input.userId, action: "commented" },
     });
+    await onCommentAdded(tx, comment.issue, input.userId, input.body);
     return comment;
   });
 }

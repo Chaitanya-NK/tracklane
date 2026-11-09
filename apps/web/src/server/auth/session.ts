@@ -10,6 +10,7 @@ export interface CurrentUser {
   name: string;
   email: string;
   image: string | null;
+  emailVerified: boolean;
 }
 
 /**
@@ -24,8 +25,8 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   await connection();
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) return null;
-  const { id, name, email, image } = session.user;
-  return { id, name, email, image: image ?? null };
+  const { id, name, email, image, emailVerified } = session.user;
+  return { id, name, email, image: image ?? null, emailVerified };
 });
 
 /** Like getCurrentUser, but sends signed-out visitors to sign-in. */

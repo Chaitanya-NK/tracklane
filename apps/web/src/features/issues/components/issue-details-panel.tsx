@@ -15,8 +15,7 @@ import { format } from "date-fns";
 import { ShieldCheckIcon } from "lucide-react";
 import { useAction } from "next-safe-action/hooks";
 import { toast } from "sonner";
-import type { ReactNode } from "react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { DatePicker, parseDateValue } from "@/components/shared/date-picker";
 import { TimeAgo } from "@/components/shared/time-ago";
 import { UserAvatar } from "@/components/shared/user-avatar";
@@ -38,6 +37,7 @@ import type { IssueFormOptions } from "../types";
 import { CustomFieldInput } from "./custom-field-input";
 import { AssigneePicker, LabelsPicker, ParentPicker } from "./field-pickers";
 import { IssueTypeIcon, PriorityIcon } from "./issue-meta";
+import { ResolveDialog } from "./resolve-dialog";
 import { useIssueUpdate } from "./use-issue-update";
 
 export interface IssueDetailsValue {
@@ -57,6 +57,7 @@ export interface IssueDetailsValue {
   createdAt: Date;
   updatedAt: Date;
   resolvedAt: Date | null;
+  resolutionId: string | null;
   hasChildren: boolean;
   /** Custom field values by field id. */
   fieldValues: Record<string, CustomFieldValue>;
@@ -95,6 +96,7 @@ export function IssueDetailsPanel({
   const nameOf = (userId: string | null) => options.assignees.find((u) => u.id === userId)?.name;
   const parentLabel = issue.type === "subtask" ? "Parent" : "Epic";
   const setField = useAction(setIssueFieldValueAction);
+  const [resolving, setResolving] = useState<{ id: string; name: string } | null>(null);
 
   async function saveField(fieldId: string, name: string, value: CustomFieldValue | null) {
     const res = await setField.executeAsync({ issueId: issue.id, fieldId, value });
@@ -149,6 +151,15 @@ export function IssueDetailsPanel({
           value={issue.statusId}
           onValueChange={(statusId) => {
             const status = options.statuses.find((s) => s.id === statusId);
+            // Entering Done asks for a resolution (unless the workspace has none).
+            if (
+              status?.category === "done" &&
+              issue.status.category !== "done" &&
+              options.resolutions.length
+            ) {
+              setResolving(status);
+              return;
+            }
             void save({ statusId }, `Status changed to ${status?.name ?? "new status"}`);
           }}
           disabled={disabled}
@@ -170,6 +181,45 @@ export function IssueDetailsPanel({
           </SelectContent>
         </Select>
       </Row>
+      {resolving ? (
+        <ResolveDialog
+          open
+          statusName={resolving.name}
+          resolutions={options.resolutions}
+          onCancel={() => setResolving(null)}
+          onResolve={(resolutionId) => {
+            const name = options.resolutions.find((r) => r.id === resolutionId)?.name;
+            setResolving(null);
+            void save(
+              { statusId: resolving.id, resolutionId },
+              `Resolved as ${name} · moved to ${resolving.name}`,
+            );
+          }}
+        />
+      ) : null}
+      {issue.status.category === "done" && options.resolutions.length ? (
+        <Row label="Resolution" htmlFor="f-resolution">
+          <Select
+            value={issue.resolutionId ?? ""}
+            onValueChange={(resolutionId) => {
+              const name = options.resolutions.find((r) => r.id === resolutionId)?.name;
+              void save({ resolutionId }, `Resolution changed to ${name}`);
+            }}
+            disabled={disabled}
+          >
+            <SelectTrigger id="f-resolution" size="sm" className="w-full">
+              <SelectValue placeholder="Unresolved" />
+            </SelectTrigger>
+            <SelectContent>
+              {options.resolutions.map((r) => (
+                <SelectItem key={r.id} value={r.id}>
+                  {r.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Row>
+      ) : null}
       <Row label="Assignee" htmlFor="f-assignee">
         <AssigneePicker
           id="f-assignee"

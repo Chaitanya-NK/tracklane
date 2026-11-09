@@ -1,5 +1,5 @@
 import "server-only";
-import { AppError, slugify } from "@tracklane/core";
+import { AppError, DEFAULT_RESOLUTIONS, slugify } from "@tracklane/core";
 import { db, Prisma } from "@tracklane/db";
 import { assertWorkspacePermission } from "@/server/authz";
 
@@ -27,6 +27,14 @@ export async function createWorkspace(input: { name: string; slug?: string; user
           slug,
           createdById: input.userId,
           members: { create: { userId: input.userId, role: "owner" } },
+          resolutions: {
+            create: DEFAULT_RESOLUTIONS.map((r, position) => ({
+              name: r.name,
+              description: r.description,
+              isDefault: "isDefault" in r && r.isDefault,
+              position,
+            })),
+          },
         },
         select: { id: true, name: true, slug: true },
       });

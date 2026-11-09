@@ -1,6 +1,7 @@
 import "server-only";
 import { AppError, type StatusCategory, type WorkspaceRole } from "@tracklane/core";
 import { db, Prisma } from "@tracklane/db";
+import { defaultResolutionId } from "@/features/resolutions/server/apply";
 import { assertWorkspacePermission } from "@/server/authz";
 
 type Tx = Prisma.TransactionClient;
@@ -32,15 +33,29 @@ function duplicateName(error: unknown, name: string): never {
   throw error;
 }
 
-/** resolvedAt follows the status category, so changing a category re-stamps its issues. */
+/**
+ * resolvedAt and the resolution follow the status category, so changing a category (or moving
+ * issues into another status) re-stamps them: Done gets the default resolution where missing.
+ */
 async function syncResolvedAt(tx: Tx, statusId: string, category: StatusCategory) {
   if (category === "done") {
+    const status = await tx.workflowStatus.findUniqueOrThrow({
+      where: { id: statusId },
+      select: { project: { select: { workspaceId: true } } },
+    });
     await tx.issue.updateMany({
       where: { statusId, resolvedAt: null },
       data: { resolvedAt: new Date() },
     });
+    await tx.issue.updateMany({
+      where: { statusId, resolutionId: null },
+      data: { resolutionId: await defaultResolutionId(tx, status.project.workspaceId) },
+    });
   } else {
-    await tx.issue.updateMany({ where: { statusId }, data: { resolvedAt: null } });
+    await tx.issue.updateMany({
+      where: { statusId },
+      data: { resolvedAt: null, resolutionId: null },
+    });
   }
 }
 

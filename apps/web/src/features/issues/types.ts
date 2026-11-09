@@ -14,6 +14,8 @@ export interface IssueFormOptions {
   /** The project's workflow rules, to grey out moves it won't allow. */
   transitions: { restrict: boolean; rules: TransitionRule[] };
   customFields: CustomFieldDef[];
+  /** The workspace's resolutions, in order; the default one is flagged. */
+  resolutions: { id: string; name: string; description: string; isDefault: boolean }[];
   currentUserId: string;
   canCreate: boolean;
   canEdit: boolean;

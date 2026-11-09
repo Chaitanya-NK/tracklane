@@ -13,6 +13,8 @@ export function SettingsTabs() {
         { title: "General", href: workspacePath(workspace, "settings") },
         { title: "Members", href: workspacePath(workspace, "settings/members") },
         { title: "TQL functions", href: workspacePath(workspace, "settings/functions") },
+        { title: "Resolutions", href: workspacePath(workspace, "settings/resolutions") },
+        { title: "My notifications", href: workspacePath(workspace, "settings/notifications") },
       ]}
     />
   );

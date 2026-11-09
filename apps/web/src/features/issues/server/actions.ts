@@ -77,7 +77,12 @@ export const createIssueAction = authActionClient
   });
 
 export const updateIssueAction = authActionClient
-  .inputSchema(z.object({ issueId: z.string(), patch: z.object(issueFields).partial() }))
+  .inputSchema(
+    z.object({
+      issueId: z.string(),
+      patch: z.object({ ...issueFields, resolutionId: z.string() }).partial(),
+    }),
+  )
   .action(async ({ parsedInput, ctx }) => {
     const result = await updateIssue({ ...parsedInput, userId: ctx.user.id });
     refresh();
