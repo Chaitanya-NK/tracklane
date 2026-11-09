@@ -18,5 +18,6 @@ export {
   type TqlParseOptions,
 } from "./fields";
 export { type Token, tokenize, TqlError } from "./lexer";
+export { highlightTql, type TqlSpan, type TqlSpanKind } from "./highlight";
 export { parseTql, type TqlParseResult } from "./parser";
 export { suggestTql, type TqlCatalog, type TqlSuggestion, type TqlSuggestions } from "./suggest";
