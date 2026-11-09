@@ -1,5 +1,11 @@
 import { lookup } from "node:dns/promises";
-import { isPrivateAddress, nextWebhookRetry, SIGNATURE_HEADER, signWebhook } from "@tracklane/core";
+import {
+  isPrivateAddress,
+  nextWebhookRetry,
+  SIGNATURE_HEADER,
+  signWebhook,
+  slackText,
+} from "@tracklane/core";
 import { db } from "@tracklane/db";
 import { env } from "../env";
 import { logger } from "../lib/logger";
@@ -23,11 +29,15 @@ async function send(delivery: {
   id: string;
   event: string;
   payload: unknown;
-  webhook: { url: string; secret: string };
+  webhook: { url: string; secret: string; format: string };
 }) {
   const url = new URL(delivery.webhook.url);
   await assertPublicHost(url);
-  const body = JSON.stringify({ id: delivery.id, ...(delivery.payload as object) });
+  const payload = delivery.payload as { event: string; data: Record<string, unknown> };
+  const body =
+    delivery.webhook.format === "slack"
+      ? JSON.stringify({ text: slackText({ event: payload.event, data: payload.data ?? {} }) })
+      : JSON.stringify({ id: delivery.id, ...(delivery.payload as object) });
   const res = await fetch(url, {
     method: "POST",
     redirect: "manual",
@@ -59,7 +69,7 @@ export async function deliverWebhooks(now = new Date()) {
       payload: true,
       attempts: true,
       webhookId: true,
-      webhook: { select: { url: true, secret: true } },
+      webhook: { select: { url: true, secret: true, format: true } },
     },
   });
   for (const delivery of due) {
