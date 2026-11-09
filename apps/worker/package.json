@@ -14,13 +14,16 @@
   "dependencies": {
     "@tracklane/core": "workspace:*",
     "@tracklane/db": "workspace:*",
+    "@tracklane/email": "workspace:*",
     "pg-boss": "^11.0.0",
     "pino": "^10.0.0",
+    "web-push": "^4.0.0",
     "zod": "^4.1.0"
   },
   "devDependencies": {
     "@tracklane/config": "workspace:*",
     "@types/node": "^22.0.0",
+    "@types/web-push": "^3.6.4",
     "eslint": "^9.39.0",
     "pino-pretty": "^13.0.0",
     "tsx": "^4.20.0",
