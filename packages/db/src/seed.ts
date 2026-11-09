@@ -341,6 +341,7 @@ async function seedDemoProject(workspaceId: string, demoUserId: string) {
   await seedSprints(project.id, ids, dateIn);
   await seedPhase5(workspaceId, project.id, ids, demoUserId, priya.id);
   await seedPhase6(workspaceId, project.id, demoUserId, priya.id);
+  await seedPhase7(workspaceId, project.id, demoUserId, priya.id);
 
   await db.comment.createMany({
     data: [
@@ -575,6 +576,186 @@ async function seedPhase6(
         readAt: minutesAgo(60),
       },
     ],
+  });
+}
+
+/**
+ * Reports, time and SLAs: history for burndown / velocity / cumulative flow, logged time,
+ * two SLAs and a shared dashboard.
+ */
+async function seedPhase7(
+  workspaceId: string,
+  projectId: string,
+  demoUserId: string,
+  priyaId: string,
+) {
+  const DAY = 86_400_000;
+  const today = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00Z");
+  const day = (offset: number) => new Date(today.getTime() + offset * DAY);
+
+  // Earlier sprints, so velocity has a history.
+  for (const [i, [committed, completed]] of [
+    [12, 9],
+    [14, 13],
+    [16, 15],
+  ].entries()) {
+    await db.sprint.create({
+      data: {
+        projectId,
+        name: `Beta ${i + 1}`,
+        state: "completed",
+        startDate: day(-80 + i * 14),
+        endDate: day(-66 + i * 14),
+        startedAt: day(-80 + i * 14),
+        completedAt: day(-66 + i * 14),
+        committedPoints: committed,
+        completedPoints: completed,
+        completedIssues: Math.round(completed! / 2),
+        incompleteIssues: 1,
+      },
+    });
+  }
+
+  // Daily snapshots: 30 days of flow, plus the active sprint's burndown (scope grew on day 3).
+  const statuses = await db.workflowStatus.findMany({
+    where: { projectId },
+    orderBy: { position: "asc" },
+  });
+  const active = await db.sprint.findFirst({ where: { projectId, state: "active" } });
+  const burn = [20, 19, 17, 21, 18, 15];
+  for (let offset = -29; offset <= 0; offset++) {
+    const t = offset + 29;
+    const done = Math.min(4, Math.floor(t / 7));
+    const inProgress = 2 + (t % 3 === 0 ? 1 : 0);
+    const todo = Math.max(2, 11 - Math.floor(t / 4));
+    const sprintDay = offset + 5;
+    const inSprint = active && sprintDay >= 0 && sprintDay < burn.length;
+    await db.projectSnapshot.create({
+      data: {
+        projectId,
+        date: day(offset),
+        statusCounts: Object.fromEntries(
+          statuses.map((s, i) => [s.id, [todo, inProgress, 0, done][i] ?? 0]),
+        ),
+        todoCount: todo,
+        inProgressCount: inProgress,
+        doneCount: done,
+        sprintId: inSprint ? active!.id : null,
+        sprintScope: inSprint ? (sprintDay >= 3 ? 22 : 20) : 0,
+        sprintRemaining: inSprint ? burn[sprintDay]! : 0,
+        sprintIssues: inSprint ? 8 : 0,
+        sprintOpenIssues: inSprint ? Math.max(2, 8 - sprintDay) : 0,
+      },
+    });
+  }
+
+  // Time tracking.
+  const issues = await db.issue.findMany({
+    where: { projectId, type: { not: "epic" } },
+    orderBy: { number: "asc" },
+    select: { id: true, assigneeId: true },
+    take: 6,
+  });
+  const estimates = [16 * 60, 8 * 60, 4 * 60, 24 * 60];
+  for (const [i, issue] of issues.entries()) {
+    if (estimates[i])
+      await db.issue.update({ where: { id: issue.id }, data: { timeEstimate: estimates[i] } });
+    const who = issue.assigneeId ?? (i % 2 ? priyaId : demoUserId);
+    for (const back of [0, 1, 2, 6, 8].slice(0, 2 + (i % 3))) {
+      await db.worklog.create({
+        data: {
+          issueId: issue.id,
+          userId: who,
+          minutes: [90, 120, 45, 240, 60][(i + back) % 5]!,
+          date: day(-back),
+          note: ["Implementation", "Code review fixes", "Pairing", "Investigation", "Tests"][
+            (i + back) % 5
+          ]!,
+        },
+      });
+    }
+  }
+
+  await db.slaPolicy.createMany({
+    data: [
+      {
+        projectId,
+        name: "Bugs resolved within 3 days",
+        query: "type = bug",
+        metric: "resolution",
+        targetMinutes: 3 * 1440,
+        warnMinutes: 12 * 60,
+        position: 0,
+      },
+      {
+        projectId,
+        name: "High priority first response in 4h",
+        query: "priority >= high",
+        metric: "first_response",
+        targetMinutes: 240,
+        warnMinutes: 60,
+        position: 1,
+      },
+    ],
+  });
+
+  await db.dashboard.create({
+    data: {
+      workspaceId,
+      ownerId: demoUserId,
+      name: "Web Platform overview",
+      description: "Sprint health, bugs and SLAs for the WEB team",
+      shared: true,
+      widgets: [
+        {
+          id: "bugs",
+          title: "Open bugs",
+          size: "half",
+          type: "count",
+          config: { query: "project = WEB AND type = bug AND statusCategory != done" },
+        },
+        {
+          id: "status",
+          title: "Open work by status",
+          size: "half",
+          type: "breakdown",
+          config: { query: "project = WEB AND statusCategory != done", field: "status" },
+        },
+        {
+          id: "burn",
+          title: "Sprint burndown",
+          size: "half",
+          type: "burndown",
+          config: { projectKey: "WEB" },
+        },
+        {
+          id: "velocity",
+          title: "Velocity",
+          size: "half",
+          type: "velocity",
+          config: { projectKey: "WEB" },
+        },
+        {
+          id: "trend",
+          title: "Created vs resolved",
+          size: "full",
+          type: "created_resolved",
+          config: { query: "project = WEB", days: 30 },
+        },
+        { id: "sla", title: "SLAs", size: "half", type: "sla", config: { projectKey: "WEB" } },
+        {
+          id: "urgent",
+          title: "Highest priority, not done",
+          size: "half",
+          type: "list",
+          config: {
+            query:
+              "project = WEB AND priority >= high AND statusCategory != done ORDER BY priority DESC",
+            limit: 5,
+          },
+        },
+      ],
+    },
   });
 }
 
