@@ -43,6 +43,26 @@ async function seedDemo() {
     update: {},
     create: { ...DEMO_WORKSPACE, createdById: user.id },
   });
+  // Default resolutions (skipped when the workspace already has them).
+  if (!(await db.resolution.count({ where: { workspaceId: workspace.id } }))) {
+    await db.resolution.createMany({
+      // Same list as DEFAULT_RESOLUTIONS in @tracklane/core (this package doesn't depend on it).
+      data: [
+        ["Done", "The work is complete"],
+        ["Fixed", "A fix has been made"],
+        ["Won't fix", "It won't be addressed"],
+        ["Duplicate", "Covered by another issue"],
+        ["Cannot reproduce", "The problem couldn't be reproduced"],
+        ["Works as designed", "Behaving as intended"],
+      ].map(([name, description], position) => ({
+        workspaceId: workspace.id,
+        name: name!,
+        description: description!,
+        isDefault: position === 0,
+        position,
+      })),
+    });
+  }
   await db.workspaceMember.upsert({
     where: { workspaceId_userId: { workspaceId: workspace.id, userId: user.id } },
     update: {},
@@ -320,6 +340,7 @@ async function seedDemoProject(workspaceId: string, demoUserId: string) {
   });
   await seedSprints(project.id, ids, dateIn);
   await seedPhase5(workspaceId, project.id, ids, demoUserId, priya.id);
+  await seedPhase6(workspaceId, project.id, demoUserId, priya.id);
 
   await db.comment.createMany({
     data: [
@@ -476,6 +497,84 @@ async function seedPhase5(
       query: '"Customer facing" = true AND statusCategory != done ORDER BY priority DESC',
       shared: true,
     },
+  });
+}
+
+/** Resolutions on finished issues, watchers, a mention and a few inbox items for the demo user. */
+async function seedPhase6(
+  workspaceId: string,
+  projectId: string,
+  demoUserId: string,
+  priyaId: string,
+) {
+  const fallback = await db.resolution.findFirst({
+    where: { workspaceId },
+    orderBy: [{ isDefault: "desc" }, { position: "asc" }],
+  });
+  const fixed = await db.resolution.findFirst({ where: { workspaceId, name: "Fixed" } });
+  const done = await db.issue.findMany({
+    where: { projectId, status: { category: "done" } },
+    orderBy: { number: "asc" },
+    select: { id: true, type: true },
+  });
+  for (const issue of done) {
+    await db.issue.update({
+      where: { id: issue.id },
+      data: { resolutionId: (issue.type === "bug" ? fixed : fallback)?.id ?? null },
+    });
+  }
+
+  const issues = await db.issue.findMany({
+    where: { projectId },
+    orderBy: { number: "asc" },
+    select: { id: true, number: true, title: true, reporterId: true, assigneeId: true },
+  });
+  await db.issueWatcher.createMany({
+    data: issues.flatMap((i) =>
+      [...new Set([i.reporterId, i.assigneeId].filter((id): id is string => Boolean(id)))].map(
+        (userId) => ({ issueId: i.id, userId }),
+      ),
+    ),
+    skipDuplicates: true,
+  });
+
+  const target = issues.find((i) => i.assigneeId === demoUserId) ?? issues[0];
+  if (!target) return;
+  const key = `WEB-${target.number}`;
+  const body = `@[${DEMO_USER.name}](user:${demoUserId}) can you take a look at the empty state copy before Friday?`;
+  await db.comment.create({ data: { issueId: target.id, authorId: priyaId, body } });
+  await db.issueWatcher.createMany({
+    data: [{ issueId: target.id, userId: priyaId }],
+    skipDuplicates: true,
+  });
+  const url = `/${DEMO_WORKSPACE.slug}/issues/${key}`;
+  const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000);
+  await db.notification.createMany({
+    data: [
+      {
+        userId: demoUserId,
+        workspaceId,
+        issueId: target.id,
+        actorId: priyaId,
+        type: "mentioned",
+        title: `Priya Raman mentioned you on ${key}`,
+        body: "@Demo User can you take a look at the empty state copy before Friday?",
+        url,
+        createdAt: minutesAgo(12),
+      },
+      {
+        userId: demoUserId,
+        workspaceId,
+        issueId: target.id,
+        actorId: priyaId,
+        type: "status_changed",
+        title: `Priya Raman moved ${key} to In Progress`,
+        body: target.title,
+        url,
+        createdAt: minutesAgo(90),
+        readAt: minutesAgo(60),
+      },
+    ],
   });
 }
 

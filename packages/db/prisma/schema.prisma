@@ -54,6 +54,11 @@ model User {
   approvalsDecided   ApprovalRequest[]     @relation("ApprovalDecider")
   fieldValues        IssueFieldValue[]
   tqlFunctions       TqlFunction[]
+  notifications      Notification[]           @relation("NotificationRecipient")
+  notificationsSent  Notification[]           @relation("NotificationActor")
+  watching           IssueWatcher[]
+  notificationPrefs  NotificationPreference[]
+  pushSubscriptions  PushSubscription[]
 
   @@map("users")
 }
@@ -135,8 +140,10 @@ model Workspace {
   invitations  WorkspaceInvitation[]
   projects     Project[]
   issues       Issue[]
-  savedFilters SavedFilter[]
-  tqlFunctions TqlFunction[]
+  savedFilters  SavedFilter[]
+  tqlFunctions  TqlFunction[]
+  resolutions   Resolution[]
+  notifications Notification[]
 
   @@map("workspaces")
 }
@@ -299,10 +306,15 @@ model Issue {
   /// Null = in the backlog.
   sprintId    String?   @map("sprint_id")
   resolvedAt  DateTime? @map("resolved_at")
+  /// How it was resolved (Fixed, Duplicate…). Set while the status is a Done one.
+  resolutionId String?  @map("resolution_id")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
   workspace   Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  resolution  Resolution?       @relation(fields: [resolutionId], references: [id], onDelete: SetNull)
+  watchers      IssueWatcher[]
+  notifications Notification[]
   project     Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
   status      WorkflowStatus    @relation(fields: [statusId], references: [id], onDelete: Restrict)
   assignee    User?             @relation("IssueAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
@@ -323,6 +335,7 @@ model Issue {
   @@index([parentId])
   @@index([sprintId])
   @@index([projectId, position])
+  @@index([resolutionId])
   @@map("issues")
 }
 
@@ -637,4 +650,117 @@ model TqlFunction {
 
   @@unique([workspaceId, name])
   @@map("tql_functions")
+}
+
+/// How an issue was closed. Configurable per workspace (Settings → Resolutions).
+model Resolution {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  name        String
+  description String   @default("")
+  position    Int      @default(0)
+  /// Used when an issue is moved to Done without picking one (board drag, bulk edit).
+  isDefault   Boolean  @default(false) @map("is_default")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  issues    Issue[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId, position])
+  @@map("resolutions")
+}
+
+enum NotificationType {
+  assigned
+  mentioned
+  commented
+  status_changed
+  approval_requested
+  approval_decided
+  sla_at_risk
+  sla_breached
+}
+
+/// Outbox state for a delivery channel. The worker picks up `pending` rows.
+enum NotificationDelivery {
+  pending
+  sent
+  skipped
+  failed
+}
+
+model Notification {
+  id          String               @id @default(cuid())
+  userId      String               @map("user_id")
+  workspaceId String               @map("workspace_id")
+  issueId     String?              @map("issue_id")
+  actorId     String?              @map("actor_id")
+  type        NotificationType
+  /// One line, e.g. "Priya moved WEB-4 to Done".
+  title       String
+  /// Optional excerpt (comment text, rejection reason).
+  body        String               @default("")
+  /// Path inside the app, e.g. /acme/issues/WEB-4.
+  url         String
+  readAt      DateTime?            @map("read_at")
+  emailState  NotificationDelivery @default(skipped) @map("email_state")
+  pushState   NotificationDelivery @default(skipped) @map("push_state")
+  createdAt   DateTime             @default(now()) @map("created_at")
+
+  user      User      @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  actor     User?     @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  issue     Issue?    @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+  @@index([userId, workspaceId, readAt, createdAt])
+  @@index([emailState, createdAt])
+  @@index([pushState, createdAt])
+  @@map("notifications")
+}
+
+/// People who get updates about an issue (reporter, assignee, commenters, or by choice).
+model IssueWatcher {
+  issueId   String   @map("issue_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  issue Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([issueId, userId])
+  @@index([userId])
+  @@map("issue_watchers")
+}
+
+/// A user's channels for one notification type. Missing rows use the defaults in @tracklane/core.
+model NotificationPreference {
+  userId String           @map("user_id")
+  type   NotificationType
+  inApp  Boolean          @default(true) @map("in_app")
+  email  Boolean          @default(false)
+  push   Boolean          @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, type])
+  @@map("notification_preferences")
+}
+
+/// A browser's Web Push subscription.
+model PushSubscription {
+  id         String    @id @default(cuid())
+  userId     String    @map("user_id")
+  endpoint   String    @unique
+  p256dh     String
+  auth       String
+  userAgent  String    @default("") @map("user_agent")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  lastUsedAt DateTime? @map("last_used_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_subscriptions")
 }
