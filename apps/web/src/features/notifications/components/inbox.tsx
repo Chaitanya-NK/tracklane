@@ -209,7 +209,7 @@ export function Inbox({
       <Tabs value={category}>
         <TabsList aria-label="Category">
           {CATEGORIES.map((c) => (
-            <TabsTrigger key={c.id} value={c.id} asChild>
+            <TabsTrigger key={c.id} value={c.id} asChild aria-controls={undefined}>
               <Link href={href({ category: c.id, n: null })}>{c.label}</Link>
             </TabsTrigger>
           ))}

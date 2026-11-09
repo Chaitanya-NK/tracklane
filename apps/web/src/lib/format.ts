@@ -1,3 +1,4 @@
+import { APP_LOCALE } from "@/config/locale";
 /** Two-letter initials for avatars: "Chaitanya N" → "CN", "dev@acme.dev" → "DE". */
 export function initials(nameOrEmail: string): string {
   const base = nameOrEmail.includes("@") ? (nameOrEmail.split("@")[0] ?? "") : nameOrEmail;
@@ -11,7 +12,7 @@ export function initials(nameOrEmail: string): string {
 }
 
 /** Compact number formatting for stat tiles: 1284 → "1.3K". */
-export function compactNumber(value: number, locale = "en-IN"): string {
+export function compactNumber(value: number, locale = APP_LOCALE): string {
   return new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 }).format(
     value,
   );
@@ -22,12 +23,14 @@ export function formatDate(
   date: Date | string,
   options: Intl.DateTimeFormatOptions = { dateStyle: "medium" },
 ) {
-  return new Intl.DateTimeFormat("en-IN", { ...options, timeZone: "UTC" }).format(new Date(date));
+  return new Intl.DateTimeFormat(APP_LOCALE, { ...options, timeZone: "UTC" }).format(
+    new Date(date),
+  );
 }
 
 /** Timestamps in the viewer's timezone: "8 Nov 2026, 4:05 pm". */
 export function formatDateTime(date: Date | string) {
-  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(
+  return new Intl.DateTimeFormat(APP_LOCALE, { dateStyle: "medium", timeStyle: "short" }).format(
     new Date(date),
   );
 }
@@ -35,7 +38,7 @@ export function formatDateTime(date: Date | string) {
 /** "3 minutes ago", "in 2 days". `now` is injectable for tests. */
 export function relativeTime(date: Date | string, now: Date = new Date()): string {
   const seconds = Math.round((new Date(date).getTime() - now.getTime()) / 1000);
-  const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+  const rtf = new Intl.RelativeTimeFormat(APP_LOCALE, { numeric: "auto" });
   const units: [Intl.RelativeTimeFormatUnit, number][] = [
     ["year", 31_536_000],
     ["month", 2_592_000],

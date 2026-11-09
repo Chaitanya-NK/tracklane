@@ -6,7 +6,8 @@ import { TimeAgo } from "@/components/shared/time-ago";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LinkTabTrigger } from "@/components/shared/link-tabs";
+import { Tabs, TabsList } from "@/components/ui/tabs";
 import { describeActivity, IssueTable } from "@/features/issues";
 import { getWorkspaceAccess } from "@/server/authz";
 import {
@@ -81,14 +82,14 @@ export async function HomeIssueTabs({ slug, tab }: { slug: string; tab: HomeTab 
         <Tabs value={tab}>
           <TabsList aria-label="Your issues">
             {TABS.map((t) => (
-              <TabsTrigger key={t.id} value={t.id} asChild>
-                <Link
-                  href={(t.id === "assigned" ? `/${slug}` : `/${slug}?tab=${t.id}`) as Route}
-                  scroll={false}
-                >
-                  {t.label}
-                </Link>
-              </TabsTrigger>
+              <LinkTabTrigger
+                key={t.id}
+                value={t.id}
+                href={t.id === "assigned" ? `/${slug}` : `/${slug}?tab=${t.id}`}
+                scroll={false}
+              >
+                {t.label}
+              </LinkTabTrigger>
             ))}
           </TabsList>
         </Tabs>

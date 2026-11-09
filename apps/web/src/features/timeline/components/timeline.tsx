@@ -34,6 +34,7 @@ import type {
   TimelineRelease,
   TimelineSprint,
 } from "../types";
+import { APP_LOCALE } from "@/config/locale";
 
 const ROW = 40;
 const LABEL_WIDTH = 288;
@@ -45,7 +46,7 @@ const BAR_TONE = {
 } as const;
 
 const fmt = (value: string) =>
-  new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", timeZone: "UTC" }).format(
+  new Intl.DateTimeFormat(APP_LOCALE, { day: "numeric", month: "short", timeZone: "UTC" }).format(
     new Date(`${value}T00:00:00Z`),
   );
 

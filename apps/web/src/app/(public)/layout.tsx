@@ -16,7 +16,13 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
           <ThemeToggle />
         </div>
       </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
+      <main
+        id="main"
+        tabIndex={-1}
+        className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 outline-none"
+      >
+        {children}
+      </main>
       <footer className="border-t py-4 text-center text-xs text-muted-foreground">
         Powered by {siteConfig.name}
       </footer>

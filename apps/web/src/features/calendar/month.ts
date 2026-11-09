@@ -1,3 +1,4 @@
+import { APP_LOCALE } from "@/config/locale";
 /** Month grid maths (UTC, weeks start on Monday). Months are "YYYY-MM". */
 const DAY = 86_400_000;
 
@@ -19,7 +20,7 @@ export function monthGrid(month: string): string[] {
 }
 
 export function monthLabel(month: string): string {
-  return new Intl.DateTimeFormat("en-IN", {
+  return new Intl.DateTimeFormat(APP_LOCALE, {
     month: "long",
     year: "numeric",
     timeZone: "UTC",
@@ -50,6 +51,10 @@ export function shiftWeek(monday: string, delta: number): string {
 
 export function weekLabel(monday: string): string {
   const days = weekGrid(monday);
-  const f = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", timeZone: "UTC" });
+  const f = new Intl.DateTimeFormat(APP_LOCALE, {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
   return `${f.format(new Date(`${days[0]}T00:00:00Z`))} – ${f.format(new Date(`${days[6]}T00:00:00Z`))}`;
 }

@@ -12,6 +12,41 @@ const codespacesDomain = process.env.CODESPACE_NAME
 const forwardedHosts = codespacesDomain ? [`*.${codespacesDomain}`] : [];
 const devHosts = isDev ? ["localhost:3000", "127.0.0.1:3000", ...forwardedHosts] : [];
 
+const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+const httpsOnly = appUrl.startsWith("https:");
+
+// Without nonces (pages are partially prerendered), so inline scripts are allowed; everything
+// else is locked to this origin. Excalidraw fetches its fonts from a CDN, and avatars can come
+// from Google/GitHub, hence https: for fonts and images.
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' blob: data: https:",
+  "font-src 'self' data: https:",
+  "connect-src 'self' https://esm.sh https://unpkg.com",
+  "worker-src 'self' blob:",
+  "manifest-src 'self'",
+  "frame-src 'none'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+  ...(httpsOnly ? ["upgrade-insecure-requests"] : []),
+].join("; ");
+
+const securityHeaders = [
+  { key: "Content-Security-Policy", value: contentSecurityPolicy },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" },
+  ...(httpsOnly
+    ? [{ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" }]
+    : []),
+];
+
 const nextConfig: NextConfig = {
   // Cache Components: data is dynamic by default; opt in to caching with "use cache".
   cacheComponents: true,
@@ -25,6 +60,9 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: isDev ? ["localhost", "127.0.0.1", ...forwardedHosts] : [],
   // The realtime server (Socket.IO) is reached through this origin, so it works wherever the
   // web app does (Codespaces port forwarding, a single public port in production).
+  async headers() {
+    return [{ source: "/(.*)", headers: securityHeaders }];
+  },
   async rewrites() {
     return {
       beforeFiles: [

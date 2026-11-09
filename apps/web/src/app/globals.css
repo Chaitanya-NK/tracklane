@@ -27,7 +27,8 @@
   --secondary: oklch(0.967 0.001 286.375);
   --secondary-foreground: oklch(0.21 0.006 285.885);
   --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
+  /* zinc-500 is 4.4:1 on --muted; a touch darker clears WCAG AA (4.5:1) for small text. */
+  --muted-foreground: oklch(0.51 0.016 285.938);
   --accent: oklch(0.967 0.001 286.375);
   --accent-foreground: oklch(0.21 0.006 285.885);
   --destructive: oklch(0.577 0.245 27.325);
@@ -49,10 +50,11 @@
   --sidebar-ring: oklch(0.705 0.015 286.067);
 
   /* Tracklane domain colors (status categories, issue types) */
-  --status-todo: oklch(0.552 0.016 285.938);
-  --status-in-progress: oklch(0.546 0.245 262.881);
-  --status-review: oklch(0.666 0.179 58.318);
-  --status-done: oklch(0.627 0.194 149.214);
+  /* 700-800 shades: status text sits on a 12% tint of itself and must reach 4.5:1 at 11px. */
+  --status-todo: oklch(0.51 0.016 285.938);
+  --status-in-progress: oklch(0.488 0.243 264.376);
+  --status-review: oklch(0.555 0.163 48.998);
+  --status-done: oklch(0.448 0.119 151.328);
   --type-story: oklch(0.627 0.194 149.214);
   --type-task: oklch(0.546 0.245 262.881);
   --type-bug: oklch(0.577 0.245 27.325);
@@ -156,5 +158,17 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
+  }
+}
+
+/* Respect "reduce motion": keep state changes, drop the movement. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

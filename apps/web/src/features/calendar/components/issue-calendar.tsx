@@ -36,13 +36,14 @@ import {
   weekLabel,
 } from "../month";
 import type { CalendarIssue, CalendarSprint } from "../types";
+import { APP_LOCALE } from "@/config/locale";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MAX_PER_DAY = 3;
 const UNSCHEDULED = "unscheduled";
 
 const dayLabel = (day: string) =>
-  new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", timeZone: "UTC" }).format(
+  new Intl.DateTimeFormat(APP_LOCALE, { day: "numeric", month: "short", timeZone: "UTC" }).format(
     new Date(`${day}T00:00:00Z`),
   );
 
@@ -95,6 +96,8 @@ function DraggableChip({
       ref={setNodeRef}
       {...attributes}
       {...listeners}
+      role="group"
+      aria-roledescription="Draggable issue"
       aria-label={`${issue.key}: ${issue.title}`}
       className={cn("touch-none", !disabled && "cursor-grab", isDragging && "opacity-30")}
     >

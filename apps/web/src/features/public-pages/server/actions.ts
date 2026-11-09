@@ -4,6 +4,7 @@ import { cookies, headers } from "next/headers";
 import { refresh } from "next/cache";
 import { z } from "zod";
 import { env } from "@/env";
+import { clientIp, rateLimit } from "@/server/rate-limit";
 import { getProjectAccess, getWorkspaceAccess } from "@/server/authz";
 import { actionClient, authActionClient } from "@/server/safe-action";
 import { subscribeToRoadmap, toggleVote } from "./roadmap";
@@ -51,9 +52,7 @@ export const submitPortalRequestAction = actionClient
     }),
   )
   .action(async ({ parsedInput }) => {
-    const h = await headers();
-    const sender =
-      h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
+    const sender = clientIp(await headers());
     return submitPortalRequest({ ...parsedInput, workspaceSlug: parsedInput.slug, sender });
   });
 
@@ -138,6 +137,7 @@ const VOTER_COOKIE = "tl_voter";
 export const toggleRoadmapVoteAction = actionClient
   .inputSchema(z.object({ slug: z.string(), projectKey: z.string(), issueId: z.string() }))
   .action(async ({ parsedInput }) => {
+    rateLimit("roadmap-vote", clientIp(await headers()), { limit: 30, windowMs: 60_000 });
     const jar = await cookies();
     let voter = jar.get(VOTER_COOKIE)?.value;
     if (!voter || !/^[\w-]{20,60}$/.test(voter)) {
@@ -170,6 +170,7 @@ export const subscribeRoadmapAction = actionClient
     }),
   )
   .action(async ({ parsedInput }) => {
+    rateLimit("roadmap-subscribe", clientIp(await headers()), { limit: 5, windowMs: 10 * 60_000 });
     await subscribeToRoadmap({
       workspaceSlug: parsedInput.slug,
       projectKey: parsedInput.projectKey,

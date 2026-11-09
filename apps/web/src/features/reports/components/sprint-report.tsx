@@ -4,6 +4,7 @@ import Link from "next/link";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import { IssueTypeIcon, PriorityIcon, StatusBadge } from "@/features/issues";
 import { cn } from "@/lib/utils";
+import { APP_LOCALE } from "@/config/locale";
 
 export interface SprintReportData {
   committed: { points: number | null; issues: number | null };
@@ -25,7 +26,7 @@ export interface SprintReportData {
 }
 
 const fmt = (d: string) =>
-  new Date(`${d}T00:00:00Z`).toLocaleDateString("en-IN", {
+  new Date(`${d}T00:00:00Z`).toLocaleDateString(APP_LOCALE, {
     day: "numeric",
     month: "short",
     timeZone: "UTC",

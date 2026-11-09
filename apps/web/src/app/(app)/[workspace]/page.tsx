@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import { Suspense } from "react";
 import { HeadingSkeleton, TableSkeleton } from "@/components/shared/skeletons";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,6 +20,9 @@ type Props = PageProps<"/[workspace]">;
 
 async function Greeting({ params }: { params: Props["params"] }) {
   const { workspace } = await params;
+  // Reading the clock is request-time work; without this, runtime prefetch would hit
+  // "new Date() while prerendering".
+  await connection();
   // Server time in IST is a fair default for a greeting; it only picks morning/afternoon/evening.
   const hour = Number(
     new Intl.DateTimeFormat("en-GB", {

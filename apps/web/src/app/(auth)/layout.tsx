@@ -18,7 +18,9 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           {siteConfig.name}
         </Link>
         <div className="flex flex-1 items-center justify-center py-10">
-          <div className="w-full max-w-sm">{children}</div>
+          <main id="main" tabIndex={-1} className="w-full max-w-sm outline-none">
+            {children}
+          </main>
         </div>
       </div>
       <aside className="relative hidden flex-col justify-end overflow-hidden bg-muted p-10 lg:flex">

@@ -205,6 +205,9 @@ export function SortableIssueCard({
         style={{ transform: CSS.Transform.toString(transform), transition }}
         {...attributes}
         {...listeners}
+        // dnd-kit makes this a button, but it wraps the card's own link and menu buttons;
+        // a group can hold interactive children and keyboard dragging still works on focus.
+        role="group"
         aria-roledescription="Draggable issue"
         aria-label={`${card.key}: ${card.title}`}
         className="touch-none rounded-lg focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"

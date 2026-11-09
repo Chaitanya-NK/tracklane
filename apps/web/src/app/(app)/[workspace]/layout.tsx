@@ -28,7 +28,11 @@ export default function WorkspaceLayout({ children, params }: LayoutProps<"/[wor
         <AppSidebar params={params} />
         <SidebarInset className="min-w-0">
           <AppHeader />
-          <main className="mx-auto w-full max-w-7xl flex-1 p-4 md:p-6">
+          <main
+            id="main"
+            tabIndex={-1}
+            className="mx-auto w-full max-w-7xl flex-1 p-4 outline-none md:p-6"
+          >
             <Suspense fallback={<PageFallback />}>
               <WorkspaceGate params={params}>{children}</WorkspaceGate>
             </Suspense>

@@ -10,7 +10,9 @@ export function CenteredCardLayout({ children }: { children: React.ReactNode }) 
         <BrandMark className="size-7" />
         {siteConfig.name}
       </Link>
-      <div className="w-full max-w-md">{children}</div>
+      <main id="main" tabIndex={-1} className="w-full max-w-md outline-none">
+        {children}
+      </main>
     </div>
   );
 }

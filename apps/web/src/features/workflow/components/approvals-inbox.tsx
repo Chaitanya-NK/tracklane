@@ -144,7 +144,7 @@ export function ApprovalsInbox({
               ["done", "Done", `${base}?tab=done`],
             ] as const
           ).map(([value, title, href]) => (
-            <TabsTrigger key={value} value={value} asChild>
+            <TabsTrigger key={value} value={value} asChild aria-controls={undefined}>
               <Link href={href as Route}>{title}</Link>
             </TabsTrigger>
           ))}

@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ServiceWorker } from "./service-worker";
 import { ThemeProvider } from "./theme-provider";
 
 /** Client-side providers shared by every page. Add query/realtime providers here later. */
@@ -12,6 +13,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
       <TooltipProvider delayDuration={300}>
         {children}
         <Toaster richColors closeButton />
+        <ServiceWorker />
       </TooltipProvider>
     </ThemeProvider>
   );
