@@ -54,9 +54,9 @@ export const roadmap: RoadmapPhase[] = [
     carryOver: ["Custom issue types per project"],
   },
   { phase: 9, title: "Collaboration", summary: "Docs, diagrams, whiteboard, retros, poker" },
-  { phase: 10, title: "AI (Gemini)", summary: "Plain-English search, duplicates, release notes" },
+  // Phase 10 (AI features) was dropped from the plan; the numbers stay so history lines up.
   { phase: 11, title: "API & public pages", summary: "REST API, webhooks, portal, status page" },
   { phase: 12, title: "Hardening", summary: "Audit log, SSO, i18n, accessibility, PWA" },
 ];
 
-export const CURRENT_PHASE = 8;
+export const CURRENT_PHASE = 9;

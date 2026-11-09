@@ -6,11 +6,13 @@ import { useParams, usePathname } from "next/navigation";
 import {
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import {
+  collaborateNav,
   findNavItem,
   type NavItem,
   primaryNav,
@@ -24,7 +26,9 @@ function NavGroup({
   activeSegment,
   className,
   badges,
+  label,
 }: {
+  label?: string;
   items: NavItem[];
   slug: string;
   activeSegment: string | undefined;
@@ -33,6 +37,7 @@ function NavGroup({
 }) {
   return (
     <SidebarGroup className={className}>
+      {label ? <SidebarGroupLabel>{label}</SidebarGroupLabel> : null}
       <SidebarGroupContent>
         <SidebarMenu>
           {items.map((item) => (
@@ -65,6 +70,12 @@ export function NavMain({ badges }: { badges?: Partial<Record<string, ReactNode>
   return (
     <>
       <NavGroup items={primaryNav} slug={workspace} activeSegment={active} badges={badges} />
+      <NavGroup
+        label="Collaborate"
+        items={collaborateNav}
+        slug={workspace}
+        activeSegment={active}
+      />
       <NavGroup items={secondaryNav} slug={workspace} activeSegment={active} className="mt-auto" />
     </>
   );

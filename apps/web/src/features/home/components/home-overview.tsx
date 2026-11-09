@@ -56,7 +56,7 @@ export function HomeOverview({
             <CardHeader>
               <CardTitle>Build progress</CardTitle>
               <CardDescription>
-                Phase {CURRENT_PHASE} of {roadmap.length - 1} complete
+                Phase {CURRENT_PHASE} of {roadmap.at(-1)!.phase} complete
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

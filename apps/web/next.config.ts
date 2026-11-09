@@ -38,7 +38,8 @@ const nextConfig: NextConfig = {
     };
   },
   experimental: {
-    serverActions: { allowedOrigins: devHosts },
+    // Whiteboard scenes are saved through a server action.
+    serverActions: { allowedOrigins: devHosts, bodySizeLimit: "5mb" },
   },
   turbopack: {
     rules: {

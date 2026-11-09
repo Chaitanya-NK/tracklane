@@ -1,12 +1,16 @@
 import type { Route } from "next";
 import {
   BellIcon,
+  FileTextIcon,
   FilterIcon,
   FolderIcon,
   HomeIcon,
   LayoutDashboardIcon,
   type LucideIcon,
+  MessagesSquareIcon,
+  PenToolIcon,
   SettingsIcon,
+  SpadeIcon,
   TargetIcon,
   UsersIcon,
 } from "lucide-react";
@@ -39,11 +43,19 @@ export const primaryNav: NavItem[] = [
   { title: "Team", segment: "teams", icon: UsersIcon, availableInPhase: 7 },
 ];
 
+/** Shown under a "Collaborate" heading. */
+export const collaborateNav: NavItem[] = [
+  { title: "Docs", segment: "docs", icon: FileTextIcon, availableInPhase: 9 },
+  { title: "Whiteboards", segment: "whiteboards", icon: PenToolIcon, availableInPhase: 9 },
+  { title: "Retros", segment: "retros", icon: MessagesSquareIcon, availableInPhase: 9 },
+  { title: "Planning poker", segment: "poker", icon: SpadeIcon, availableInPhase: 9 },
+];
+
 export const secondaryNav: NavItem[] = [
   { title: "Settings", segment: "settings", icon: SettingsIcon, availableInPhase: 1 },
 ];
 
-const allNav = [...primaryNav, ...secondaryNav];
+const allNav = [...primaryNav, ...collaborateNav, ...secondaryNav];
 
 /** Matches a pathname like "/acme/projects/web" to its nav item. */
 export function findNavItem(pathname: string): NavItem | undefined {

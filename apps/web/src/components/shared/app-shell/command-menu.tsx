@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/command";
 import { Kbd } from "@/components/ui/kbd";
 import { SidebarMenuButton } from "@/components/ui/sidebar";
-import { primaryNav, secondaryNav, workspacePath } from "@/config/navigation";
+import { collaborateNav, primaryNav, secondaryNav, workspacePath } from "@/config/navigation";
 import { useCreateIssue } from "@/features/issues";
 
 /** ⌘K / Ctrl+K command palette. Issues, actions and AI search plug into this in later phases. */
@@ -71,7 +71,7 @@ export function CommandMenu() {
           </CommandGroup>
           <CommandSeparator />
           <CommandGroup heading="Navigate">
-            {[...primaryNav, ...secondaryNav].map((item) => (
+            {[...primaryNav, ...collaborateNav, ...secondaryNav].map((item) => (
               <CommandItem
                 key={item.segment}
                 onSelect={() => run(() => router.push(workspacePath(workspace, item.segment)))}

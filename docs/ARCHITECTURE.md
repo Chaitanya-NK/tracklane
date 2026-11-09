@@ -157,11 +157,12 @@ state = pending`, so two approvers can't both decide) and then applies the statu
   sent/failed/skipped. Gone push subscriptions (404/410) are deleted.
 - **Realtime.** Services `publish()` small events with `pg_notify` inside the transaction, so
   they're only delivered after commit. `apps/realtime` LISTENs and emits them to Socket.IO
-  rooms (`user:<id>`, `ws:<workspace>:project:<id>`, `ws:<workspace>:issue:<id>`). Browsers
+  rooms (`user:<id>`, `ws:<workspace>:<project|issue|doc|whiteboard|retro|poker>:<id>`). Browsers
   connect through the web origin (`/api/realtime` is rewritten to the realtime server) with a
   10-minute HMAC token from `/api/realtime-token` that lists the user's workspaces; the server
   refuses rooms outside them (`canJoinRoom`). `<LiveRefresh rooms>` refreshes a page when
-  someone else changes something in it; `<Viewers room>` shows who else is on an issue.
+  someone else changes something in it (`issue:changed`, or `room:changed` from
+  `publishRoomChanged`); `<Viewers room>` shows who else is there (every room but projects).
 - **Resolutions** (`features/resolutions`). Workspace-configurable. `resolutionFields` stamps
   `resolved_at` and the resolution when an issue enters a Done status (the chosen one, else the
   default) and clears both when it leaves Done. The details panel asks with a Resolve dialog;
@@ -221,6 +222,28 @@ state = pending`, so two approvers can't both decide) and then applies the statu
   `issues.recurring` job (hourly, and on start) calls `POST /api/internal/recurring`, which
   claims each due row by advancing `next_run_at` before creating the issue, so overlapping runs
   can't create duplicates.
+
+## Collaboration
+
+Under **Collaborate** in the sidebar; all four are workspace-level, readable by everyone and
+editable with `issues:update`.
+
+- **Docs** (`features/docs`). Markdown pages in the workspace or a project, nested up to five
+  levels. Every save writes a `doc_versions` row; saves carry the version they started from and
+  are refused if someone saved in between (the editor offers to save over it). History can
+  restore any version. ` ```mermaid ` blocks render as diagrams (`MermaidDiagram`, loaded on
+  demand, `securityLevel: "strict"`) here and everywhere else Markdown is shown.
+- **Whiteboards** (`features/whiteboards`). Excalidraw (MIT). Edits are relayed live through
+  the realtime server (`whiteboard:update` / `whiteboard:pointer`, never stored there) and
+  merged with `reconcileElements`; each editor saves the scene 1.5 s after their last change
+  (last write wins, capped at 4 MB).
+- **Retros** (`features/retros`). Template columns (one is "Action items"), and phases
+  brainstorm → vote → discuss → closed moved by the facilitator (creator or admin). While
+  brainstorming, other people's cards are hidden server-side; votes (one per card, N per
+  person) show totals from discussion on. Action items become tasks in the retro's project.
+- **Planning poker** (`features/poker`). A queue of issues and a deck. Votes are hidden until
+  the facilitator reveals; `summarizeVotes` suggests the deck card nearest the median, and
+  "Save & next" writes the estimate through the issue service.
 
 ## Search, filters and views
 

@@ -12,11 +12,14 @@ export const rooms = {
   user: (userId: string) => `user:${userId}`,
   project: (workspaceId: string, projectId: string) => `ws:${workspaceId}:project:${projectId}`,
   issue: (workspaceId: string, issueId: string) => `ws:${workspaceId}:issue:${issueId}`,
+  /** Docs, whiteboards, retros and poker sessions: one room per item. */
+  item: (workspaceId: string, kind: "doc" | "whiteboard" | "retro" | "poker", id: string) =>
+    `ws:${workspaceId}:${kind}:${id}`,
 };
 
 export interface RealtimeEvent {
   rooms: string[];
-  event: "issue:changed" | "notification:new";
+  event: "issue:changed" | "notification:new" | "room:changed";
   data: Record<string, string | number | boolean | null>;
 }
 
@@ -29,4 +32,19 @@ export async function publish(tx: Prisma.TransactionClient, event: RealtimeEvent
   const payload = JSON.stringify(event);
   if (payload.length > 7000) return;
   await tx.$executeRaw`select pg_notify(${REALTIME_CHANNEL}, ${payload})`;
+}
+
+/** Tells everyone else in an item's room to re-fetch (retros, poker, docs). */
+export function publishRoomChanged(
+  tx: Prisma.TransactionClient,
+  workspaceId: string,
+  kind: "doc" | "whiteboard" | "retro" | "poker",
+  id: string,
+  actorId: string,
+) {
+  return publish(tx, {
+    rooms: [rooms.item(workspaceId, kind, id)],
+    event: "room:changed",
+    data: { actorId },
+  });
 }

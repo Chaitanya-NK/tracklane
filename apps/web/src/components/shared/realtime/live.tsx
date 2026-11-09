@@ -7,7 +7,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useRealtime } from "./realtime-provider";
 
 /**
- * Joins realtime rooms while mounted and re-fetches the page when someone else changes an issue
+ * Joins realtime rooms while mounted and re-fetches the page when someone else changes something
  * in them (debounced, so a bulk edit is one refresh). Renders nothing.
  */
 export function LiveRefresh({ rooms }: { rooms: string[] }) {
@@ -28,10 +28,12 @@ export function LiveRefresh({ rooms }: { rooms: string[] }) {
       timer = setTimeout(() => router.refresh(), 400);
     };
     socket.on("issue:changed", onChange);
+    socket.on("room:changed", onChange);
     return () => {
       clearTimeout(timer);
       socket.off("connect", join);
       socket.off("issue:changed", onChange);
+      socket.off("room:changed", onChange);
       list.forEach((room) => socket.emit("room:leave", room));
     };
   }, [socket, key, router, userId]);
@@ -45,7 +47,7 @@ interface Viewer {
   image: string | null;
 }
 
-/** Avatars of other people looking at the same issue right now. */
+/** Avatars of other people in the same room (issue, doc, retro…) right now. */
 export function Viewers({ room }: { room: string }) {
   const { socket, userId } = useRealtime();
   const [viewers, setViewers] = useState<Viewer[]>([]);
