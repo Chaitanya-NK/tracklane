@@ -72,17 +72,19 @@ export async function saveComponent(
   input: { name: string; description: string; status: ComponentStatus },
 ) {
   await admin(workspaceId, userId);
+  // Pick fields explicitly: callers may pass a wider object (e.g. the action's parsed input).
+  const data = { name: input.name, description: input.description, status: input.status };
   if (id) {
     const { count } = await db.statusComponent.updateMany({
       where: { id, workspaceId },
-      data: input,
+      data,
     });
     if (!count) throw new AppError("not_found", "Component not found");
     return;
   }
   const count = await db.statusComponent.count({ where: { workspaceId } });
   if (count >= 30) throw new AppError("conflict", "A status page can list at most 30 components");
-  await db.statusComponent.create({ data: { ...input, workspaceId, position: count } });
+  await db.statusComponent.create({ data: { ...data, workspaceId, position: count } });
 }
 
 export async function deleteComponent(workspaceId: string, userId: string, id: string) {

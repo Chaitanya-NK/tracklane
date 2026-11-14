@@ -18,7 +18,8 @@ export async function setProjectPublicPages(
   await assertWorkspacePermission(workspaceId, userId, "projects:update");
   const { count } = await db.project.updateMany({
     where: { id: projectId, workspaceId },
-    data: input,
+    // Pick fields explicitly: callers may pass a wider object (e.g. the action's parsed input).
+    data: { portalEnabled: input.portalEnabled, roadmapPublic: input.roadmapPublic },
   });
   if (!count) throw new AppError("not_found", "Project not found");
   const project = await db.project.findUnique({
@@ -34,7 +35,7 @@ export async function setProjectPublicPages(
       id: projectId,
       label: project && `${project.key} · ${project.name}`,
     },
-    metadata: input,
+    metadata: { portalEnabled: input.portalEnabled, roadmapPublic: input.roadmapPublic },
   });
 }
 
