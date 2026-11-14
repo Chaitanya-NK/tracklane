@@ -36,6 +36,16 @@ model User {
   /// Workspace opened most recently; "/" redirects there.
   lastWorkspaceId String? @map("last_workspace_id")
 
+  // Profile (shown on /<workspace>/people/<id>; visible to people who share a workspace).
+  jobTitle   String? @map("job_title")
+  department String?
+  location   String?
+  /// IANA zone, e.g. "Asia/Kolkata"; shows the person's local time.
+  timezone   String?
+  bio        String?
+  /// Storage key of an uploaded photo; `image` then points at /api/avatars/<id>.
+  avatarKey  String? @map("avatar_key")
+
   sessions            Session[]
   auditEvents         AuditEvent[]
   accounts            Account[]
