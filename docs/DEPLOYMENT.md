@@ -19,8 +19,9 @@ Two things decide where it can run:
 
 The simplest setup is **one Linux VM running `deploy/docker-compose.yml`**: Postgres, the three
 processes and Caddy, which gets HTTPS certificates from Let's Encrypt automatically. Any VM with
-2 GB of RAM or more and Docker works. Oracle Cloud's Always Free tier offers ARM VMs that are
-large enough at no cost. The image builds for ARM and x86.
+2 GB of RAM or more and Docker works. Oracle Cloud's Always Free tier offers an Arm VM
+(2 OCPUs, 12 GB) that is large enough at no cost; [DEPLOY-ORACLE.md](DEPLOY-ORACLE.md) walks
+through it from account creation. The image builds for Arm and x86.
 
 ## Environment variables
 
