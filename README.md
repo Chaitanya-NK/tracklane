@@ -61,6 +61,19 @@ how to enable it. Create a free OAuth app and put its keys in `.env`:
 
 Restart the web app afterwards. "Sign in with SSO" is a placeholder: SAML/OIDC isn't built.
 
+## Deploy it
+
+One Linux server with Docker runs everything (Postgres, the app, realtime, the worker and Caddy
+for HTTPS):
+
+```bash
+cp deploy/.env.example deploy/.env   # set DOMAIN, NEXT_PUBLIC_APP_URL, secrets, SMTP
+docker compose -f deploy/docker-compose.yml up -d --build
+```
+
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) lists every environment variable and covers DNS,
+updates, backups and other layouts.
+
 ## What's running
 
 | Process               | Port | What it does                                                 |

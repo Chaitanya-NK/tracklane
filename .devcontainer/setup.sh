@@ -39,7 +39,6 @@ fi
 if [ -n "${CODESPACE_NAME:-}" ]; then
   DOMAIN="${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev}"
   sed -i "s#^NEXT_PUBLIC_APP_URL=.*#NEXT_PUBLIC_APP_URL=https://${CODESPACE_NAME}-3000.${DOMAIN}#" .env
-  sed -i "s#^NEXT_PUBLIC_REALTIME_URL=.*#NEXT_PUBLIC_REALTIME_URL=https://${CODESPACE_NAME}-4001.${DOMAIN}#" .env
 fi
 
 echo "▸ Installing dependencies"

@@ -1,0 +1,109 @@
+# Production stack for one server: Postgres, the three Tracklane processes and Caddy (HTTPS).
+#   cp deploy/.env.example deploy/.env   # then fill it in
+#   docker compose -f deploy/docker-compose.yml up -d --build
+# See docs/DEPLOYMENT.md.
+name: tracklane
+
+x-app: &app
+  image: tracklane:latest
+  build:
+    context: ..
+    dockerfile: Dockerfile
+    args:
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:?Set NEXT_PUBLIC_APP_URL in deploy/.env}
+      NEXT_PUBLIC_APP_LOCALE: ${NEXT_PUBLIC_APP_LOCALE:-en-IN}
+      NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
+  env_file: .env
+  environment:
+    NODE_ENV: production
+    # Bundled Postgres unless you point DATABASE_URL at a managed one.
+    DATABASE_URL: ${DATABASE_URL:-postgresql://tracklane:${POSTGRES_PASSWORD}@postgres:5432/tracklane}
+    REALTIME_INTERNAL_URL: http://realtime:4001
+    INTERNAL_APP_URL: http://web:3000
+    REALTIME_PORT: "4001"
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tracklane
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}
+      POSTGRES_DB: tracklane
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tracklane -d tracklane"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  # Applies pending migrations, then exits. The app services wait for it.
+  migrate:
+    <<: *app
+    restart: "no"
+    working_dir: /app/packages/db
+    command: ["node_modules/.bin/prisma", "migrate", "deploy"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    <<: *app
+    working_dir: /app/apps/web
+    command: ["node_modules/.bin/next", "start", "--hostname", "0.0.0.0", "--port", "3000"]
+    volumes:
+      - uploads:/app/.data/uploads
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  realtime:
+    <<: *app
+    working_dir: /app/apps/realtime
+    command: ["node_modules/.bin/tsx", "src/index.ts"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    <<: *app
+    working_dir: /app/apps/worker
+    command: ["node_modules/.bin/tsx", "src/index.ts"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN in deploy/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  uploads:
+  caddy-data:
+  caddy-config:

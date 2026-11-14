@@ -31,7 +31,6 @@ export const env = createEnv({
   },
   client: {
     NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
-    NEXT_PUBLIC_REALTIME_URL: z.string().url().default("http://localhost:4001"),
     /** Web Push public key (setup.sh generates the pair). Push is off when it's missing. */
     NEXT_PUBLIC_VAPID_PUBLIC_KEY: z.string().optional(),
   },
@@ -46,7 +45,6 @@ export const env = createEnv({
     STORAGE_DIR: process.env.STORAGE_DIR,
     MAX_UPLOAD_MB: process.env.MAX_UPLOAD_MB,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
-    NEXT_PUBLIC_REALTIME_URL: process.env.NEXT_PUBLIC_REALTIME_URL,
     NEXT_PUBLIC_VAPID_PUBLIC_KEY: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
     REALTIME_INTERNAL_URL: process.env.REALTIME_INTERNAL_URL,
     REQUIRE_EMAIL_VERIFICATION: process.env.REQUIRE_EMAIL_VERIFICATION,

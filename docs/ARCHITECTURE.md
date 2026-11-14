@@ -314,6 +314,19 @@ editable with `issues:update`.
 - Subtasks follow their parent between sprints (except out of completed sprints) and don't
   appear as backlog rows.
 
+## People and profiles
+
+- `/<workspace>/people/<userId>` (`features/people`): photo, job title, department, location,
+  time zone (with live local time), bio, workspace role, stats (open, in progress, resolved and
+  comments in 30 days) and tabs for assigned work, activity and projects. Only members of the
+  same workspace can open it; `/<workspace>/profile` redirects to your own. Reached from the user
+  menu, member names in Settings → Members, and the `G U` shortcut.
+- Profile fields live on `users`. Photos are uploaded to `POST /api/avatars`, re-encoded with
+  sharp to a 256 px WebP (which strips metadata such as GPS), stored with the attachment storage
+  driver and served from `/api/avatars/<id>` to people who share a workspace. The file key is
+  part of the URL, so it can be cached for a week.
+- Time zones are stored under their current IANA names (Chrome still lists `Asia/Calcutta`).
+
 ## Hardening
 
 - **Audit log** (`server/audit`, `features/audit`, Settings → Audit log, admins only). Services
@@ -376,6 +389,9 @@ editable with `issues:update`.
 - **Commits:** Conventional Commits (`feat(web): …`, `fix(db): …`), enforced by commitlint.
 - **Formatting:** Prettier (+ Tailwind class sorting) on commit via lint-staged.
 - **Types:** `strict` + `noUncheckedIndexedAccess`. No `any` without a comment explaining why.
+- **Deployment:** one image (`Dockerfile`) for every process, and `deploy/docker-compose.yml`
+  with Postgres and Caddy. See [DEPLOYMENT.md](DEPLOYMENT.md). CI builds the image and boots
+  the stack.
 - **Tests:** Vitest next to the code (`*.test.ts[x]`). Playwright e2e in `apps/web/e2e`
   against a production build and the demo seed: `pnpm build && pnpm --filter @tracklane/web
 test:e2e` (set `E2E_BASE_URL` to reuse a running server). CI runs both.

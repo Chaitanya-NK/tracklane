@@ -1,0 +1,14 @@
+# HTTPS with automatic Let's Encrypt certificates for $DOMAIN.
+# DOMAIN=:80 serves plain HTTP (for trying the stack without a domain).
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Realtime (Socket.IO, incl. WebSockets) goes straight to its server.
+	handle /api/realtime* {
+		reverse_proxy realtime:4001
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+}

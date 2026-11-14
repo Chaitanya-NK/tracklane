@@ -61,3 +61,39 @@ jobs:
           name: playwright-report
           path: apps/web/playwright-report
           retention-days: 7
+
+  docker:
+    name: Docker image and production stack
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure deploy/.env for plain HTTP on localhost
+        run: |
+          cp deploy/.env.example deploy/.env
+          sed -i "s#^DOMAIN=.*#DOMAIN=:80#" deploy/.env
+          sed -i "s#^NEXT_PUBLIC_APP_URL=.*#NEXT_PUBLIC_APP_URL=http://localhost#" deploy/.env
+          sed -i "s#^BETTER_AUTH_SECRET=.*#BETTER_AUTH_SECRET=$(openssl rand -hex 32)#" deploy/.env
+          sed -i "s#^POSTGRES_PASSWORD=.*#POSTGRES_PASSWORD=$(openssl rand -hex 16)#" deploy/.env
+      - name: Build and start the stack
+        run: docker compose -f deploy/docker-compose.yml up -d --build
+      - name: Wait until healthy
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost/api/health; then echo; exit 0; fi
+            sleep 5
+          done
+          exit 1
+      - name: Smoke test
+        run: |
+          set -e
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost/sign-in)" = 200
+          curl -fsS -X POST http://localhost/api/auth/sign-up/email \
+            -H 'content-type: application/json' -H 'origin: http://localhost' \
+            -d '{"name":"CI","email":"ci@example.com","password":"ci-password-123"}' | grep -q '"user"'
+          curl -fsS "http://localhost/api/realtime/?EIO=4&transport=polling" | grep -q '"sid"'
+          docker compose -f deploy/docker-compose.yml ps
+          test "$(docker compose -f deploy/docker-compose.yml ps -a --format '{{.Service}} {{.ExitCode}}' | grep '^migrate ' | cut -d' ' -f2)" = 0
+      - name: Logs
+        if: always()
+        run: docker compose -f deploy/docker-compose.yml logs --tail 150

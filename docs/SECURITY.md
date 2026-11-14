@@ -22,6 +22,9 @@ reporting on the repository, with steps to reproduce. We aim to reply within a w
 
 ## Access control
 
+- Profiles and profile photos are visible only to people who share a workspace with that person.
+  Uploaded photos are re-encoded, which drops embedded metadata such as location.
+
 - Every read and write goes through services that check the workspace role
   (owner, admin, member, viewer, guest). The UI hides controls, but the server decides.
 - API tokens are per person and workspace, read-only or read & write, optionally expiring.
