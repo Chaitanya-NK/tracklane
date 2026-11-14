@@ -1,12 +1,15 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { SidebarMenu, SidebarMenuItem } from "@/components/ui/sidebar";
+import { getUserCard } from "@/features/people/server";
 import { getCurrentUser } from "@/server/auth";
 import { UserMenu } from "./user-menu";
 
 async function UserNavLoader() {
-  const user = await getCurrentUser();
-  if (!user) return null;
-  return <UserMenu user={user} />;
+  const session = await getCurrentUser();
+  if (!session) return null;
+  // Fresh copy so a new name or photo shows right away.
+  const user = (await getUserCard(session.id)) ?? session;
+  return <UserMenu user={{ name: user.name, email: user.email, image: user.image ?? null }} />;
 }
 
 export function UserNavFallback() {

@@ -53,6 +53,7 @@ const CHORDS: { key: string; label: string; segment?: string; project?: string }
   { key: "f", label: "Filters", segment: "filters" },
   { key: "d", label: "Dashboards", segment: "dashboards" },
   { key: "t", label: "Team", segment: "teams" },
+  { key: "u", label: "Your profile", segment: "profile" },
   { key: "b", label: "Board (in a project)", project: "board" },
   { key: "l", label: "Backlog (in a project)", project: "backlog" },
   { key: "r", label: "Reports (in a project)", project: "reports" },

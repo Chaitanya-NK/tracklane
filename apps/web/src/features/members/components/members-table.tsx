@@ -1,5 +1,7 @@
 "use client";
 
+import type { Route } from "next";
+import Link from "next/link";
 import {
   canAssignRole,
   canRemoveMember,
@@ -223,7 +225,12 @@ export function MembersTable({
                       </Avatar>
                       <div className="min-w-0">
                         <p className="truncate font-medium">
-                          {member.user.name}
+                          <Link
+                            href={`/${slug}/people/${member.user.id}` as Route}
+                            className="hover:underline"
+                          >
+                            {member.user.name}
+                          </Link>
                           {isSelf ? (
                             <span className="font-normal text-muted-foreground"> (you)</span>
                           ) : null}

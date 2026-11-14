@@ -7,11 +7,21 @@ export interface AvatarUser {
   image?: string | null;
 }
 
-export function UserAvatar({ user, className }: { user: AvatarUser; className?: string }) {
+export function UserAvatar({
+  user,
+  className,
+  fallbackClassName,
+}: {
+  user: AvatarUser;
+  className?: string;
+  fallbackClassName?: string;
+}) {
   return (
     <Avatar className={cn("size-6", className)}>
       {user.image ? <AvatarImage src={user.image} alt="" /> : null}
-      <AvatarFallback className="text-[10px]">{initials(user.name)}</AvatarFallback>
+      <AvatarFallback className={cn("text-[10px]", fallbackClassName)}>
+        {initials(user.name)}
+      </AvatarFallback>
     </Avatar>
   );
 }

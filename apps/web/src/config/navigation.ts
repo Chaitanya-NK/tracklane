@@ -62,7 +62,8 @@ const allNav = [...primaryNav, ...collaborateNav, ...secondaryNav];
 /** Matches a pathname like "/acme/projects/web" to its nav item. */
 export function findNavItem(pathname: string): NavItem | undefined {
   const [, , first = ""] = pathname.split("/");
-  // Issue pages (/acme/issues/PAY-1) belong to Projects.
-  const segment = first === "issues" ? "projects" : first;
+  // Issue pages (/acme/issues/PAY-1) belong to Projects; profiles to Team.
+  const segment =
+    first === "issues" ? "projects" : first === "people" || first === "profile" ? "teams" : first;
   return allNav.find((item) => item.segment === segment);
 }

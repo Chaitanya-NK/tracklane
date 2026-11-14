@@ -1,7 +1,16 @@
 "use client";
 
-import { ChevronsUpDownIcon, LogOutIcon, MoonIcon, SunIcon } from "lucide-react";
-import { useRouter } from "next/navigation";
+import {
+  ChevronsUpDownIcon,
+  LogOutIcon,
+  MoonIcon,
+  SettingsIcon,
+  SunIcon,
+  UserIcon,
+} from "lucide-react";
+import type { Route } from "next";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -39,6 +48,7 @@ export function UserMenu({ user }: UserMenuProps) {
   const router = useRouter();
   const { isMobile } = useSidebar();
   const { resolvedTheme, setTheme } = useTheme();
+  const { workspace } = useParams<{ workspace?: string }>();
 
   async function signOut() {
     const { error } = await authClient.signOut();
@@ -78,6 +88,23 @@ export function UserMenu({ user }: UserMenuProps) {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            {workspace ? (
+              <>
+                <DropdownMenuItem asChild>
+                  <Link href={`/${workspace}/profile` as Route}>
+                    <UserIcon aria-hidden="true" />
+                    Your profile
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href={`/${workspace}/settings/account` as Route}>
+                    <SettingsIcon aria-hidden="true" />
+                    Account settings
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            ) : null}
             <DropdownMenuItem
               onSelect={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
             >
