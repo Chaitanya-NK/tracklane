@@ -11,6 +11,8 @@ test("account settings list this session", async ({ page }) => {
 test("role changes show up in the audit log and its CSV export", async ({ page }) => {
   await page.goto("/acme/settings/members");
   const trigger = page.getByRole("combobox", { name: /^Role for/ }).first();
+  // The selected value renders after hydration; read it only once it's there.
+  await expect(trigger).toHaveText(/\S/);
   const current = (await trigger.innerText()).trim();
   await trigger.click();
   const options = (await page.getByRole("option").allInnerTexts()).map((o) => o.trim());
